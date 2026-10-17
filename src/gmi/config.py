@@ -15,19 +15,30 @@ class GMIError(Exception):
     """A safe, actionable error that can be shown to the user."""
 
 
+BUILTIN_DEFAULT_MODEL = "deepseek-ai/DeepSeek-V3.2"
+
+
 def config_path():
     return Path.home() / ".config" / "gmi" / "config.toml"
 
 
 def read_key():
+    return read_config().get("api_key")
+
+
+def read_config():
     try:
         with config_path().open("rb") as handle:
-            key = tomllib.load(handle).get("api_key")
+            values = tomllib.load(handle)
+        key = values.get("api_key")
         if key is not None and not isinstance(key, str):
             raise GMIError("Invalid config; run gmi auth login --stdin to replace it.")
-        return key
+        default_model = values.get("default_model")
+        if default_model is not None and not isinstance(default_model, str):
+            raise GMIError("Invalid config; run gmi config set default_model <id> to replace it.")
+        return values
     except FileNotFoundError:
-        return None
+        return {}
     except (OSError, ValueError):
         raise GMIError("Cannot read config; run gmi auth login --stdin to replace it.") from None
 
@@ -39,20 +50,38 @@ def resolve_key(flag=None):
     return key.strip()
 
 
+def resolve_model(flag=None):
+    return flag or os.environ.get("GMI_MODEL") or read_config().get("default_model") or BUILTIN_DEFAULT_MODEL
+
+
 def mask_key(key):
     return "gmi_..." + (key[-4:] if len(key) > 8 else "****")
 
 
 def save_key(key):
+    save_config(api_key=key)
+
+
+def save_config(api_key=None, default_model=None, unset_default=False):
     path = config_path()
     temporary = None
     try:
+        current = read_config() if path.exists() else {}
+        if api_key is not None:
+            current["api_key"] = api_key
+        if unset_default:
+            current.pop("default_model", None)
+        elif default_model is not None:
+            current["default_model"] = default_model
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         fd, temporary = tempfile.mkstemp(dir=path.parent, prefix=".config-")
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            # JSON string escaping is compatible with TOML basic strings.
-            handle.write("api_key = " + json.dumps(key, ensure_ascii=False) + "\n")
+            for name in ("api_key", "default_model"):
+                if name in current:
+                    # JSON string escaping is compatible with TOML basic strings.
+                    handle.write(name + " = " + json.dumps(current[name], ensure_ascii=False) + "\n")
         os.replace(temporary, path)
+        os.chmod(path, 0o600)
     except OSError:
         raise GMIError("Cannot save credentials; check permissions on ~/.config/gmi.") from None
     finally:

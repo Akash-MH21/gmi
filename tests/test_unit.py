@@ -7,9 +7,10 @@ from click.testing import CliRunner
 import httpx
 import pytest
 
+import gmi.api as api
 from gmi.api import check_response, client, sse_events
 from gmi.cli import main, model_table, price_per_million
-from gmi.config import GMIError, config_path, mask_key, read_key, resolve_key, save_key
+from gmi.config import GMIError, config_path, mask_key, read_key, resolve_key, resolve_model, save_config, save_key
 
 
 @pytest.fixture(autouse=True)
@@ -80,6 +81,32 @@ def test_status_error_formatting(status, match):
         check_response(httpx.Response(status))
 
 
+def test_429_classification():
+    overloaded = httpx.Response(429, json={"error": {"type": "service_unavailable", "message": "all endpoints overloaded"}})
+    limited = httpx.Response(429, json={"error": {"type": "rate_limit", "message": "too many requests"}})
+    with pytest.raises(GMIError, match="overloaded"):
+        check_response(overloaded)
+    with pytest.raises(GMIError, match="Rate limit reached"):
+        check_response(limited)
+
+
+def test_429_retry_logic(monkeypatch):
+    responses = [httpx.Response(429, headers={"retry-after": "60"},
+                                json={"error": {"type": "service_unavailable", "message": "overloaded"}}),
+                 httpx.Response(200, json={"choices": []})]
+    class FakeConnection:
+        def post(self, *args, **kwargs):
+            return responses.pop(0)
+    class FakeClient:
+        def __enter__(self): return FakeConnection()
+        def __exit__(self, *args): pass
+    monkeypatch.setattr(api, "client", lambda key: FakeClient())
+    sleeps = []
+    monkeypatch.setattr(api.time, "sleep", sleeps.append)
+    assert api.complete("key", {"model": "test/model"}) == {"choices": []}
+    assert sleeps == [30.0]
+
+
 def test_network_error_formatting():
     with pytest.raises(GMIError, match="check your connection"):
         with client("unit-only-key"):
@@ -140,3 +167,11 @@ def test_default_model_and_help():
     result = CliRunner().invoke(main, ["chat", "--help"])
     assert result.exit_code == 0
     assert "openai/gpt-5.4-mini" in result.stdout
+
+
+def test_default_model_precedence(monkeypatch):
+    save_config(default_model="config/model")
+    assert resolve_model() == "config/model"
+    monkeypatch.setenv("GMI_MODEL", "env/model")
+    assert resolve_model() == "env/model"
+    assert resolve_model("flag/model") == "flag/model"

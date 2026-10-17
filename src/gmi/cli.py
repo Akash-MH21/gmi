@@ -9,7 +9,8 @@ import sys
 import click
 
 from . import __version__, api
-from .config import GMIError, config_path, mask_key, resolve_key, save_key
+from .config import (BUILTIN_DEFAULT_MODEL, GMIError, config_path, mask_key,
+                     read_config, resolve_key, resolve_model, save_config, save_key)
 
 
 def options(function):
@@ -102,11 +103,12 @@ def price_per_million(value):
         return "-"
 
 
-def model_table(records):
+def model_table(records, current_default=None):
     rows = [["ID", "CONTEXT", "PROMPT $/1M", "COMPLETION $/1M"]]
     for record in records:
         pricing = record.get("pricing") or {}
-        rows.append([record["id"], str(record.get("context_length", "-")),
+        label = ("* " if current_default == record["id"] else "") + record["id"]
+        rows.append([label, str(record.get("context_length", "-")),
                      price_per_million(pricing.get("prompt")),
                      price_per_million(pricing.get("completion"))])
     widths = [max(len(row[i]) for row in rows) for i in range(4)]
@@ -122,22 +124,53 @@ def list_models(api_key, as_json, search):
     records = response["data"]
     if search:
         records = [r for r in records if search.casefold() in (r["id"] + " " + r.get("name", "")).casefold()]
+    current = resolve_model()
     if as_json:
-        emit({**response, "data": records})
+        emit({**response, "data": [{**record, "default": record["id"] == current} for record in records]})
     else:
-        click.echo(model_table(records))
+        click.echo(model_table(records, current))
+
+
+@main.group()
+def config():
+    """Read and update local settings."""
+
+
+@config.command("get")
+@click.argument("name", type=click.Choice(["default_model"]))
+@options
+def config_get(api_key, as_json, name):
+    """Print a setting."""
+    value = read_config().get(name) or BUILTIN_DEFAULT_MODEL
+    if as_json:
+        emit({name: value})
+    else:
+        click.echo(value)
+
+
+@config.command("set")
+@click.argument("name", type=click.Choice(["default_model"]))
+@click.argument("value")
+@options
+def config_set(api_key, as_json, name, value):
+    """Save a setting."""
+    save_config(default_model=value)
+    result = {name: value}
+    emit(result) if as_json else click.echo(f"Set {name} to {value}.")
 
 
 @main.command()
 @click.argument("prompt", required=False, default="")
 @click.option("--no-stream", is_flag=True, help="Wait for the complete response.")
-@click.option("--model", default="openai/gpt-5.4-mini", show_default=True)
+@click.option("--model", default=None, help=f"Model ID (default: {BUILTIN_DEFAULT_MODEL}, or GMI_MODEL/config; openai/gpt-5.4-mini is also available).")
 @click.option("--system", help="System instruction.")
 @click.option("--max-tokens", type=click.IntRange(min=1), help="Maximum output tokens.")
+@click.option("--no-retry", is_flag=True, help="Do not retry HTTP 429 responses.")
 @options
-def chat(api_key, as_json, prompt, no_stream, model, system, max_tokens):
+def chat(api_key, as_json, prompt, no_stream, model, system, max_tokens, no_retry):
     """Send a prompt, appending standard input when piped."""
     key = resolve_key(api_key)
+    model = resolve_model(model)
     if not sys.stdin.isatty():
         extra = sys.stdin.read().strip()
         prompt = "\n\n".join(part for part in (prompt, extra) if part)
@@ -152,11 +185,11 @@ def chat(api_key, as_json, prompt, no_stream, model, system, max_tokens):
         field = "max_completion_tokens" if model.startswith("openai/") else "max_tokens"
         payload[field] = max_tokens
     if payload["stream"]:
-        for token in api.stream(key, payload):
+        for token in api.stream(key, payload, retry=not no_retry):
             click.echo(token, nl=False)
         click.echo()
     else:
-        response = api.complete(key, payload)
+        response = api.complete(key, payload, retry=not no_retry)
         if as_json:
             emit(response)
         else:

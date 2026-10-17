@@ -1,6 +1,8 @@
 """Small HTTP client for GMI inference."""
 
 import json
+import sys
+import time
 from contextlib import contextmanager
 
 import httpx
@@ -9,11 +11,26 @@ from . import __version__
 from .config import GMIError
 
 
+def _error_details(response):
+    try:
+        error = response.json().get("error", {})
+    except (ValueError, TypeError):
+        error = {}
+    return error if isinstance(error, dict) else {}
+
+
+def is_overloaded(response):
+    error = _error_details(response)
+    return error.get("type") == "service_unavailable" or "overloaded" in str(error.get("message", "")).lower()
+
+
 def check_response(response):
     status = response.status_code
     if status == 401:
         raise GMIError("API key rejected (401); run gmi auth login with a valid key.")
     if status == 429:
+        if is_overloaded(response):
+            raise GMIError("Model is overloaded on GMI right now; try another model.")
         raise GMIError("Rate limit reached (429); wait and retry or check your quota.")
     if status >= 400:
         raise GMIError(f"GMI API returned HTTP {status}; check your request and account access.")
@@ -41,11 +58,37 @@ def models(key):
         return response.json()
 
 
-def complete(key, payload):
+def _retry_after(response):
+    value = response.headers.get("retry-after")
+    try:
+        return max(0.0, float(value)) if value is not None else 0.0
+    except ValueError:
+        return 0.0
+
+
+def _wait_retry(response, attempt, retry):
+    if not retry or response.status_code != 429 or attempt >= 2:
+        return False
+    delay = min(_retry_after(response), 30.0)
+    print(f"GMI returned 429; retrying in {delay:g}s.", file=sys.stderr)
+    time.sleep(delay)
+    return True
+
+
+def complete(key, payload, retry=True):
     with client(key) as connection:
-        response = connection.post("chat/completions", json=payload)
-        check_response(response)
-        return response.json()
+        for attempt in range(3):
+            response = connection.post("chat/completions", json=payload)
+            if response.status_code == 429 and _wait_retry(response, attempt, retry):
+                continue
+            try:
+                check_response(response)
+            except GMIError:
+                if response.status_code == 429 and is_overloaded(response):
+                    model = payload.get("model", "<unknown>")
+                    raise GMIError(f"Model {model} is overloaded on GMI right now. Try another, e.g. --model deepseek-ai/DeepSeek-V3.2") from None
+                raise
+            return response.json()
 
 
 def sse_events(lines):
@@ -63,17 +106,29 @@ def sse_events(lines):
         yield "\n".join(data)
 
 
-def stream(key, payload):
+def stream(key, payload, retry=True):
     with client(key) as connection:
-        with connection.stream("POST", "chat/completions", json=payload) as response:
-            check_response(response)
-            for event in sse_events(response.iter_lines()):
-                if event == "[DONE]":
-                    return
-                chunk = json.loads(event)
-                if "error" in chunk:
-                    raise GMIError("GMI reported a stream error; retry or check your account quota.")
-                for choice in chunk.get("choices", []):
-                    content = choice.get("delta", {}).get("content")
-                    if content:
-                        yield content
+        for attempt in range(3):
+            with connection.stream("POST", "chat/completions", json=payload) as response:
+                if response.status_code >= 400:
+                    response.read()
+                if response.status_code == 429 and _wait_retry(response, attempt, retry):
+                    continue
+                try:
+                    check_response(response)
+                except GMIError:
+                    if response.status_code == 429 and is_overloaded(response):
+                        model = payload.get("model", "<unknown>")
+                        raise GMIError(f"Model {model} is overloaded on GMI right now. Try another, e.g. --model deepseek-ai/DeepSeek-V3.2") from None
+                    raise
+                for event in sse_events(response.iter_lines()):
+                    if event == "[DONE]":
+                        return
+                    chunk = json.loads(event)
+                    if "error" in chunk:
+                        raise GMIError("GMI reported a stream error; retry or check your account quota.")
+                    for choice in chunk.get("choices", []):
+                        content = choice.get("delta", {}).get("content")
+                        if content:
+                            yield content
+                return
