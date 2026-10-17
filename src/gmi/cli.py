@@ -98,21 +98,33 @@ def logout(api_key, as_json, yes):
 
 def price_per_million(value):
     try:
-        return format(Decimal(str(value)) * 1_000_000, ".6f").rstrip("0").rstrip(".") or "0"
+        return format(Decimal(str(value)) * 1_000_000, ".2f")
     except InvalidOperation:
         return "-"
 
 
 def model_table(records, current_default=None):
-    rows = [["ID", "CONTEXT", "PROMPT $/1M", "COMPLETION $/1M"]]
+    rows = [["", "ID", "CONTEXT", "PROMPT $/1M", "COMPLETION $/1M"]]
     for record in records:
         pricing = record.get("pricing") or {}
-        label = ("* " if current_default == record["id"] else "") + record["id"]
-        rows.append([label, str(record.get("context_length", "-")),
+        marker = "*" if current_default == record["id"] else " "
+        context = record.get("context_length", "-")
+        try:
+            context = f"{int(context):,}"
+        except (TypeError, ValueError):
+            context = str(context)
+        rows.append([marker, record["id"], context,
                      price_per_million(pricing.get("prompt")),
                      price_per_million(pricing.get("completion"))])
-    widths = [max(len(row[i]) for row in rows) for i in range(4)]
-    return "\n".join("  ".join(cell.ljust(width) for cell, width in zip(row, widths)).rstrip() for row in rows)
+    widths = [max(len(row[i]) for row in rows) for i in range(5)]
+    lines = []
+    for row in rows:
+        line = row[0] + " " + row[1].ljust(widths[1])
+        line += "  " + row[2].ljust(widths[2])
+        line += "  " + row[3].ljust(widths[3])
+        line += "  " + row[4].ljust(widths[4])
+        lines.append(line.rstrip())
+    return "\n".join(lines)
 
 
 @main.command("models")

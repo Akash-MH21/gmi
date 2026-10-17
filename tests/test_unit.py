@@ -53,7 +53,7 @@ def test_mask_key():
     assert mask_key("test-secret-abcdefgh") == "gmi_...efgh"
 
 
-@pytest.mark.parametrize("value,expected", [("0.0000002", "0.2"), ("0.00000125", "1.25"), ("0", "0"), (None, "-")])
+@pytest.mark.parametrize("value,expected", [("0.0000002", "0.20"), ("0.00000125", "1.25"), ("0", "0.00"), (None, "-")])
 def test_prices(value, expected):
     assert price_per_million(value) == expected
 
@@ -61,8 +61,15 @@ def test_prices(value, expected):
 def test_table():
     table = model_table([{"id": "test/model", "context_length": 4096,
                           "pricing": {"prompt": "0.0000002", "completion": "0.00000125"}}])
-    assert table.splitlines()[0].split() == ["ID", "CONTEXT", "PROMPT", "$/1M", "COMPLETION", "$/1M"]
-    assert table.splitlines()[1].split() == ["test/model", "4096", "0.2", "1.25"]
+    lines = table.splitlines()
+    assert lines[0] == " ID          CONTEXT  PROMPT $/1M  COMPLETION $/1M"
+    assert lines[1] == "  test/model  4,096    0.20         1.25"
+    marked = model_table([{"id": "test/model", "context_length": 1050000,
+                           "pricing": {"prompt": "0.000002", "completion": "0.00001"}}], "test/model")
+    assert marked.splitlines()[0].startswith(" ID")
+    assert marked.splitlines()[1].startswith("* test/model")
+    assert "1,050,000" in marked
+    assert "2.00" in marked and "10.00" in marked
     assert len(model_table([]).splitlines()) == 1
 
 
