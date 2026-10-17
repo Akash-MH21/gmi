@@ -9,7 +9,7 @@ import pytest
 
 import gmi.api as api
 from gmi.api import check_response, client, sse_events
-from gmi.cli import main, model_table, price_per_million
+from gmi.cli import main, model_table, price_per_million, wrap_stream
 from gmi.config import GMIError, config_path, mask_key, read_key, resolve_key, resolve_model, save_config, save_key
 
 
@@ -62,15 +62,26 @@ def test_table():
     table = model_table([{"id": "test/model", "context_length": 4096,
                           "pricing": {"prompt": "0.0000002", "completion": "0.00000125"}}])
     lines = table.splitlines()
-    assert lines[0] == " ID          CONTEXT  PROMPT $/1M  COMPLETION $/1M"
+    assert lines[0] == "  ID          CONTEXT  PROMPT $/1M  COMPLETION $/1M"
     assert lines[1] == "  test/model  4,096    0.20         1.25"
+    id_offset = lines[0].index("ID")
+    assert all(line.index("test/model") == id_offset for line in lines[1:])
     marked = model_table([{"id": "test/model", "context_length": 1050000,
                            "pricing": {"prompt": "0.000002", "completion": "0.00001"}}], "test/model")
-    assert marked.splitlines()[0].startswith(" ID")
+    assert marked.splitlines()[0].startswith("  ID")
     assert marked.splitlines()[1].startswith("* test/model")
     assert "1,050,000" in marked
     assert "2.00" in marked and "10.00" in marked
     assert len(model_table([]).splitlines()) == 1
+
+
+def test_stream_wrapper_handles_chunks_newlines_and_long_words():
+    chunks = ["hel", "lo wor", "ld\nnext ", "https://example.com/verylong"]
+    output = "".join(wrap_stream(chunks, 10))
+    assert output == "hello \nworld\nnext https\n://example\n.com/veryl\nong"
+    assert "hello" in output and "world" in output
+    assert "\n" in output
+    assert max(map(len, output.splitlines())) <= 10
 
 
 def test_sse_parser():

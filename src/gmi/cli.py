@@ -4,6 +4,7 @@ from decimal import Decimal, InvalidOperation
 from functools import wraps
 import json
 import os
+import shutil
 import sys
 
 import click
@@ -104,7 +105,7 @@ def price_per_million(value):
 
 
 def model_table(records, current_default=None):
-    rows = [["", "ID", "CONTEXT", "PROMPT $/1M", "COMPLETION $/1M"]]
+    rows = [[" ", "ID", "CONTEXT", "PROMPT $/1M", "COMPLETION $/1M"]]
     for record in records:
         pricing = record.get("pricing") or {}
         marker = "*" if current_default == record["id"] else " "
@@ -125,6 +126,56 @@ def model_table(records, current_default=None):
         line += "  " + row[4].ljust(widths[4])
         lines.append(line.rstrip())
     return "\n".join(lines)
+
+
+def wrap_stream(chunks, width):
+    """Wrap streamed text at spaces while yielding completed words promptly."""
+    width = max(1, width)
+    line_length = 0
+    word = []
+
+    def emit_word():
+        nonlocal line_length
+        if not word:
+            return
+        value = "".join(word)
+        word.clear()
+        if line_length and len(value) <= width and line_length + len(value) > width:
+            yield "\n"
+            line_length = 0
+        while len(value) > width:
+            if line_length:
+                available = width - line_length
+                if available:
+                    yield value[:available]
+                    value = value[available:]
+                yield "\n"
+                line_length = 0
+            yield value[:width]
+            value = value[width:]
+            if value:
+                yield "\n"
+        if value:
+            yield value
+            line_length += len(value)
+
+    for chunk in chunks:
+        for char in chunk:
+            if char == "\n":
+                yield from emit_word()
+                yield "\n"
+                line_length = 0
+            elif char == " ":
+                yield from emit_word()
+                if line_length < width:
+                    yield " "
+                    line_length += 1
+                else:
+                    yield "\n"
+                    line_length = 0
+            else:
+                word.append(char)
+    yield from emit_word()
 
 
 @main.command("models")
@@ -178,8 +229,9 @@ def config_set(api_key, as_json, name, value):
 @click.option("--system", help="System instruction.")
 @click.option("--max-tokens", type=click.IntRange(min=1), help="Maximum output tokens.")
 @click.option("--no-retry", is_flag=True, help="Do not retry HTTP 429 responses.")
+@click.option("--no-wrap", is_flag=True, help="Do not wrap streamed output to the terminal width.")
 @options
-def chat(api_key, as_json, prompt, no_stream, model, system, max_tokens, no_retry):
+def chat(api_key, as_json, prompt, no_stream, model, system, max_tokens, no_retry, no_wrap):
     """Send a prompt, appending standard input when piped."""
     key = resolve_key(api_key)
     model = resolve_model(model)
@@ -197,7 +249,11 @@ def chat(api_key, as_json, prompt, no_stream, model, system, max_tokens, no_retr
         field = "max_completion_tokens" if model.partition("/")[0] == "openai" else "max_tokens"
         payload[field] = max_tokens
     if payload["stream"]:
-        for token in api.stream(key, payload, retry=not no_retry):
+        tokens = api.stream(key, payload, retry=not no_retry)
+        if not no_wrap and sys.stdout.isatty():
+            width = shutil.get_terminal_size(fallback=(80, 24)).columns
+            tokens = wrap_stream(tokens, width)
+        for token in tokens:
             click.echo(token, nl=False)
         click.echo()
     else:
