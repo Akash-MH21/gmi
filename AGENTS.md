@@ -55,6 +55,14 @@ be finished the day before.
   a per-sandbox `X-Access-Token` for its data plane. The Cluster Engine spec declares session-token auth only.
   Whether an API key works there is still an open question with GMI.
 
+## The one model rule (operator instruction, strict)
+
+**`openai/gpt-6.1-sol` is the only model this project uses.** It is the CLI's built-in default, the model
+every live test calls, and the only model any example, README or help text names. Do not call any
+other model, not even to probe or test, and never fall back to one automatically. Overload advice says
+to wait and retry, not to switch models. Users can still pass any `--model` themselves. That is their choice,
+not ours.
+
 ## Conventions
 
 - Python 3.10+, packaged with `pyproject.toml`, console script `gmi`. Pin exact dependency versions.
@@ -68,8 +76,7 @@ be finished the day before.
 - Anything that deletes resources or spends money beyond a normal model call asks for confirmation.
   `--yes` skips the prompt.
 - Tests: `pytest`. Unit tests for parsing and formatting. **Live tests** marked `@pytest.mark.live`, which run
-  only when `GMI_API_KEY` is set, call the real API and keep spend tiny (`max_tokens` <= 16, the cheapest
-  suitable model, e.g. `openai/gpt-5.4-nano`). Never use the expensive models in tests.
+  only when `GMI_API_KEY` is set, call the real API and keep spend tiny (`max_tokens` <= 16).
 - Style: plain, specific English in help text and docs. No em or en dashes anywhere.
 - Licence Apache-2.0. Git author `zkasuran <289388318+zkasuran@users.noreply.github.com>`.
 
