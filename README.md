@@ -12,7 +12,7 @@ gmi models
 gmi models --search nano --json
 gmi chat "Say hello"
 gmi chat "Say hello" --no-stream
-gmi chat "Say hello" --model openai/gpt-5.4-nano --max-tokens 16 --json
+gmi chat "Say hello" --model openai/gpt-6.1-sol --max-tokens 16 --json
 gmi chat "Explain this log" < log.txt
 gmi auth logout --yes
 ```
@@ -29,7 +29,7 @@ confirm removal. Errors go to stderr and return a nonzero status.
 
 Chat streams by default. `--no-stream` waits for a complete response. `--json`
 disables streaming and prints the full API response. Use `--system` for a system
-instruction. The default model is `openai/gpt-5.4-mini`. Piped text is appended
+instruction. The default model is `openai/gpt-6.1-sol`. Piped text is appended
 to the prompt with a blank line. Model prices are USD per million tokens;
 optional cache pricing and long-context overrides remain available in JSON.
 
@@ -40,6 +40,6 @@ pytest
 ```
 
 Live tests run only when `GMI_API_KEY` is set. They call the real API using
-`openai/gpt-5.4-nano` and at most 16 output tokens per request. No API mocks.
+`openai/gpt-6.1-sol` and at most 16 output tokens per request. No API mocks.
 Interactive conversation, media, generated API commands, sandbox and MCP
 commands are planned for later days.

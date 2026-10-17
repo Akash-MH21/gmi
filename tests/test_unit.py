@@ -166,12 +166,12 @@ def test_empty_prompt_and_invalid_token_limit(monkeypatch):
 def test_default_model_and_help():
     result = CliRunner().invoke(main, ["chat", "--help"])
     assert result.exit_code == 0
-    assert "openai/gpt-5.4-mini" in result.stdout
+    assert "openai/gpt-6.1-sol" in result.stdout
 
 
 def test_default_model_precedence(monkeypatch):
-    save_config(default_model="config/model")
-    assert resolve_model() == "config/model"
-    monkeypatch.setenv("GMI_MODEL", "env/model")
-    assert resolve_model() == "env/model"
-    assert resolve_model("flag/model") == "flag/model"
+    save_config(default_model="test/model-a")
+    assert resolve_model() == "test/model-a"
+    monkeypatch.setenv("GMI_MODEL", "test/model-b")
+    assert resolve_model() == "test/model-b"
+    assert resolve_model("test/model-a") == "test/model-a"

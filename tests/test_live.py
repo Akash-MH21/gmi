@@ -13,7 +13,7 @@ from gmi.config import config_path, read_key, save_key
 
 
 pytestmark = [pytest.mark.live, pytest.mark.skipif(not os.environ.get("GMI_API_KEY"), reason="GMI_API_KEY is not set")]
-MODEL = "openai/gpt-5.4-nano"
+MODEL = "openai/gpt-6.1-sol"
 
 
 @pytest.fixture
@@ -33,9 +33,9 @@ def run(runner, args, **kwargs):
 def test_live_models(runner):
     response = json.loads(run(runner, ["models", "--json"]))
     assert any(record["id"] == MODEL for record in response["data"])
-    filtered = json.loads(run(runner, ["models", "--search", "NANO", "--json"]))
+    filtered = json.loads(run(runner, ["models", "--search", "gpt-6.1-sol", "--json"]))
     assert filtered["data"]
-    assert all("nano" in (record["id"] + record.get("name", "")).lower() for record in filtered["data"])
+    assert all("gpt-6.1-sol" in (record["id"] + record.get("name", "")).lower() for record in filtered["data"])
     assert MODEL in run(runner, ["models", "--search", MODEL])
 
 

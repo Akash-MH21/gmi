@@ -162,7 +162,7 @@ def config_set(api_key, as_json, name, value):
 @main.command()
 @click.argument("prompt", required=False, default="")
 @click.option("--no-stream", is_flag=True, help="Wait for the complete response.")
-@click.option("--model", default=None, help=f"Model ID (default: {BUILTIN_DEFAULT_MODEL}, or GMI_MODEL/config; openai/gpt-5.4-mini is also available).")
+@click.option("--model", default=None, help=f"Model ID (default: {BUILTIN_DEFAULT_MODEL}, or GMI_MODEL/config).")
 @click.option("--system", help="System instruction.")
 @click.option("--max-tokens", type=click.IntRange(min=1), help="Maximum output tokens.")
 @click.option("--no-retry", is_flag=True, help="Do not retry HTTP 429 responses.")
@@ -182,7 +182,7 @@ def chat(api_key, as_json, prompt, no_stream, model, system, max_tokens, no_retr
     messages.append({"role": "user", "content": prompt})
     payload = {"model": model, "messages": messages, "stream": not (no_stream or as_json)}
     if max_tokens is not None:
-        field = "max_completion_tokens" if model.startswith("openai/") else "max_tokens"
+        field = "max_completion_tokens" if model.partition("/")[0] == "openai" else "max_tokens"
         payload[field] = max_tokens
     if payload["stream"]:
         for token in api.stream(key, payload, retry=not no_retry):

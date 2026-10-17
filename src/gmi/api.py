@@ -24,13 +24,13 @@ def is_overloaded(response):
     return error.get("type") == "service_unavailable" or "overloaded" in str(error.get("message", "")).lower()
 
 
-def check_response(response):
+def check_response(response, model="<unknown>"):
     status = response.status_code
     if status == 401:
         raise GMIError("API key rejected (401); run gmi auth login with a valid key.")
     if status == 429:
         if is_overloaded(response):
-            raise GMIError("Model is overloaded on GMI right now; try another model.")
+            raise GMIError(f"Model {model} is overloaded on GMI right now. Wait a minute and retry.")
         raise GMIError("Rate limit reached (429); wait and retry or check your quota.")
     if status >= 400:
         raise GMIError(f"GMI API returned HTTP {status}; check your request and account access.")
@@ -81,13 +81,7 @@ def complete(key, payload, retry=True):
             response = connection.post("chat/completions", json=payload)
             if response.status_code == 429 and _wait_retry(response, attempt, retry):
                 continue
-            try:
-                check_response(response)
-            except GMIError:
-                if response.status_code == 429 and is_overloaded(response):
-                    model = payload.get("model", "<unknown>")
-                    raise GMIError(f"Model {model} is overloaded on GMI right now. Try another, e.g. --model deepseek-ai/DeepSeek-V3.2") from None
-                raise
+            check_response(response, payload.get("model", "<unknown>"))
             return response.json()
 
 
@@ -114,13 +108,7 @@ def stream(key, payload, retry=True):
                     response.read()
                 if response.status_code == 429 and _wait_retry(response, attempt, retry):
                     continue
-                try:
-                    check_response(response)
-                except GMIError:
-                    if response.status_code == 429 and is_overloaded(response):
-                        model = payload.get("model", "<unknown>")
-                        raise GMIError(f"Model {model} is overloaded on GMI right now. Try another, e.g. --model deepseek-ai/DeepSeek-V3.2") from None
-                    raise
+                check_response(response, payload.get("model", "<unknown>"))
                 for event in sse_events(response.iter_lines()):
                     if event == "[DONE]":
                         return

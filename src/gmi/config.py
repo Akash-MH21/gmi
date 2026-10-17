@@ -15,7 +15,7 @@ class GMIError(Exception):
     """A safe, actionable error that can be shown to the user."""
 
 
-BUILTIN_DEFAULT_MODEL = "deepseek-ai/DeepSeek-V3.2"
+BUILTIN_DEFAULT_MODEL = "openai/gpt-6.1-sol"
 
 
 def config_path():
