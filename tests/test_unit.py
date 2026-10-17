@@ -1,0 +1,142 @@
+"""Pure formatting, parsing, credential and local CLI checks; no API mocks."""
+
+import json
+import stat
+
+from click.testing import CliRunner
+import httpx
+import pytest
+
+from gmi.api import check_response, client, sse_events
+from gmi.cli import main, model_table, price_per_million
+from gmi.config import GMIError, config_path, mask_key, read_key, resolve_key, save_key
+
+
+@pytest.fixture(autouse=True)
+def private_home(tmp_path, monkeypatch):
+    monkeypatch.setenv("HOME", str(tmp_path))
+    monkeypatch.delenv("GMI_API_KEY", raising=False)
+
+
+def test_config_permissions_and_round_trip():
+    save_key('test-key-"quoted"-abcd')
+    assert read_key() == 'test-key-"quoted"-abcd'
+    assert stat.S_IMODE(config_path().stat().st_mode) == 0o600
+    save_key("replacement")
+    assert read_key() == "replacement"
+    assert stat.S_IMODE(config_path().stat().st_mode) == 0o600
+    assert list(config_path().parent.iterdir()) == [config_path()]
+
+
+def test_precedence(monkeypatch):
+    save_key("config-key")
+    assert resolve_key() == "config-key"
+    monkeypatch.setenv("GMI_API_KEY", "env-key")
+    assert resolve_key() == "env-key"
+    assert resolve_key("flag-key") == "flag-key"
+
+
+def test_broken_config():
+    config_path().parent.mkdir(parents=True)
+    config_path().write_text("api_key = [broken")
+    with pytest.raises(GMIError, match="Cannot read config"):
+        read_key()
+
+
+@pytest.mark.parametrize("key", ["x", "abcd", "12345678"])
+def test_short_keys_are_not_exposed(key):
+    assert key not in mask_key(key)
+
+
+def test_mask_key():
+    assert mask_key("test-secret-abcdefgh") == "gmi_...efgh"
+
+
+@pytest.mark.parametrize("value,expected", [("0.0000002", "0.2"), ("0.00000125", "1.25"), ("0", "0"), (None, "-")])
+def test_prices(value, expected):
+    assert price_per_million(value) == expected
+
+
+def test_table():
+    table = model_table([{"id": "test/model", "context_length": 4096,
+                          "pricing": {"prompt": "0.0000002", "completion": "0.00000125"}}])
+    assert table.splitlines()[0].split() == ["ID", "CONTEXT", "PROMPT", "$/1M", "COMPLETION", "$/1M"]
+    assert table.splitlines()[1].split() == ["test/model", "4096", "0.2", "1.25"]
+    assert len(model_table([]).splitlines()) == 1
+
+
+def test_sse_parser():
+    lines = [": keepalive", "event: message", 'data: {"choices":', 'data: []}', "", "data: [DONE]", ""]
+    events = list(sse_events(lines))
+    assert json.loads(events[0]) == {"choices": []}
+    assert events[1] == "[DONE]"
+    assert list(sse_events(["data:tail"])) == ["tail"]
+
+
+@pytest.mark.parametrize("status,match", [(401, "API key rejected"), (429, "wait and retry"), (503, "HTTP 503")])
+def test_status_error_formatting(status, match):
+    # Exercise only the status formatter, with no HTTP request or mock transport.
+    with pytest.raises(GMIError, match=match):
+        check_response(httpx.Response(status))
+
+
+def test_network_error_formatting():
+    with pytest.raises(GMIError, match="check your connection"):
+        with client("unit-only-key"):
+            raise httpx.ConnectError("secret diagnostic must not be displayed")
+
+
+@pytest.mark.parametrize("args", [["models"], ["chat", "hello"], ["auth", "status"]])
+def test_missing_key(args):
+    result = CliRunner(mix_stderr=False).invoke(main, args)
+    assert result.exit_code == 1
+    assert result.stdout == ""
+    assert result.stderr.count("\n") == 1
+    assert "Missing API key" in result.stderr
+
+
+def test_json_login_never_prompts():
+    result = CliRunner(mix_stderr=False).invoke(main, ["--json", "auth", "login"])
+    assert result.exit_code == 1
+    assert "Provide --stdin" in result.stderr
+    assert result.stdout == ""
+
+
+def test_empty_stdin_login():
+    result = CliRunner(mix_stderr=False).invoke(main, ["auth", "login", "--stdin"], input="\n")
+    assert result.exit_code == 1
+    assert "non-empty API key" in result.stderr
+    assert not config_path().exists()
+
+
+def test_logout_confirmation_and_json(monkeypatch):
+    save_key("unit-only-key")
+    runner = CliRunner(mix_stderr=False)
+    result = runner.invoke(main, ["auth", "logout", "--json"])
+    assert result.exit_code == 1
+    assert config_path().exists()
+    result = runner.invoke(main, ["auth", "logout"], input="n\n")
+    assert result.exit_code != 0
+    assert config_path().exists()
+    monkeypatch.setenv("GMI_API_KEY", "environment-key")
+    result = runner.invoke(main, ["auth", "logout", "--yes", "--json"])
+    assert result.exit_code == 0
+    assert json.loads(result.stdout) == {"logged_out": True}
+    assert not config_path().exists()
+    assert resolve_key() == "environment-key"
+
+
+def test_empty_prompt_and_invalid_token_limit(monkeypatch):
+    monkeypatch.setenv("GMI_API_KEY", "unit-only-key")
+    runner = CliRunner(mix_stderr=False)
+    result = runner.invoke(main, ["chat"])
+    assert result.exit_code == 1
+    assert "Provide a prompt" in result.stderr
+    result = runner.invoke(main, ["chat", "hello", "--max-tokens", "0"])
+    assert result.exit_code == 2
+
+
+def test_default_model_and_help():
+    result = CliRunner().invoke(main, ["chat", "--help"])
+    assert result.exit_code == 0
+    assert "openai/gpt-5.4-mini" in result.stdout
