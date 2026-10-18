@@ -55,6 +55,26 @@ be finished the day before.
   a per-sandbox `X-Access-Token` for its data plane. The Cluster Engine spec declares session-token auth only.
   Whether an API key works there is still an open question with GMI.
 
+## Media API facts (verified live 2026-10-18)
+
+- Base: `https://console.gmicloud.ai/api/v1/ie/requestqueue/apikey`, same `Authorization: Bearer <API key>`,
+  same User-Agent rule as inference.
+- `GET /models` returns `{"model_ids": [...]}`: 377 ids today, and **many are junk or internal** (ids
+  containing `capture`, `probe`, `ssrf`, `test`, bare UUIDs, an empty string). Never show them blindly.
+- `GET /models/{id}` returns the real record: `model`, `display_name`, `brief_description`,
+  `model_type` (`image`, `video`, `audio`, `language`, ...), `status` (`active` or `inactive`),
+  `model_metadata.visibility`, `modalities.input` / `modalities.output` (lists of `{type, required}`),
+  `price_info` `{pricing_type, price, unit}` where **`price` is in millionths of a USD** (seedream-5.0-pro
+  85000 per image = $0.085, minimax-tts-speech-2.8-turbo 60000 per 1k characters = $0.06,
+  kling-3.0-turbo-t2v 112000 per second = $0.112/s), and `parameters` (each with name, type, required,
+  plus enum options) that describe the request payload.
+- A model is usable when `status == "active"`, visibility is not hidden, and its output modality matches.
+- `POST /requests` with `{"model": id, "payload": {...}}` returns `request_id` and `status` (`dispatched`).
+  `GET /requests/{id}` gives `status` (dispatched, processing, success, failed, ...) and, on success,
+  `outcome` with artifact URLs (for example `video_url`, `thumbnail_image_url`; images and audio use
+  their own keys, so read whatever URL fields the outcome holds).
+- The queue is shared per account: running music and speech at once starves speech.
+
 ## The interactive app is the product (operator, 2026-10-18)
 
 Running `gmi` with no arguments opens an interactive session in the terminal, the way Claude Code,
