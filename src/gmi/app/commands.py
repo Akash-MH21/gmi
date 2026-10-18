@@ -5,7 +5,6 @@ from difflib import get_close_matches
 
 from prompt_toolkit.completion import Completer, Completion
 
-from .. import api
 from ..config import GMIError, mask_key
 from .state import session_directory
 
@@ -69,8 +68,7 @@ def help_command(app, argument):
 @registry.command("model", "Search models or switch with /model <id>")
 def model(app, argument):
     if not argument:
-        records = api.models(app.key())["data"]
-        argument = app.pick("Model", [r["id"] for r in records])
+        argument = app.pick_model()
     if argument:
         app.state.model = argument
         app.say(f"Active model: {argument}")
@@ -79,7 +77,7 @@ def model(app, argument):
 @registry.command("models", "List live models, optionally filter")
 def models(app, argument):
     from ..cli import model_table
-    records = api.models(app.key())["data"]
+    records = app.model_records()
     records = [r for r in records if argument.casefold() in (r["id"] + " " + r.get("name", "")).casefold()]
     app.say(model_table(records, app.state.model))
 

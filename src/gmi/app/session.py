@@ -9,6 +9,8 @@ from prompt_toolkit.history import FileHistory
 from prompt_toolkit.key_binding import KeyBindings
 from prompt_toolkit.styles import Style
 from rich.console import Console
+from rich.panel import Panel
+from rich.text import Text
 
 from .. import __version__
 from ..config import GMIError, config_path, mask_key, resolve_key, resolve_model
@@ -44,6 +46,7 @@ class Session:
         self.state = Conversation(model=resolve_model(model), system=system or "")
         self.max_tokens = max_tokens
         self.running = True
+        self._models = None
         self.console = Console(highlight=False)
         directory = config_path().parent
         directory.mkdir(parents=True, exist_ok=True, mode=0o700)
@@ -68,6 +71,16 @@ class Session:
 
     def confirm(self, text):
         return PromptSession().prompt(text + " [y/N] ").lower() in ("y", "yes")
+
+    def model_records(self):
+        if self._models is None:
+            from .. import api
+            self._models = api.models(self.key())["data"]
+        return self._models
+
+    def pick_model(self):
+        from .picker import pick_model
+        return pick_model(self.model_records(), self.state.model)
 
     def pick(self, label, choices):
         if not choices:
@@ -110,7 +123,9 @@ class Session:
             key_label = mask_key(self.key())
         except GMIError:
             key_label = "not logged in, run /login"
-        self.say(f"gmi {__version__} | {self.state.model} | {key_label}\n/help for commands")
+        banner = Text(f"gmi {__version__}\n{self.state.model} | {key_label}\n{os.getcwd()}\n")
+        banner.append("/help for commands, Ctrl+D to quit", style="dim grey62")
+        self.console.print(Panel(banner, expand=False, padding=(0, 1)))
         while self.running:
             try:
                 text = self.prompt.prompt([("class:prompt", "gmi> ")]).strip()
@@ -123,7 +138,7 @@ class Session:
             except EOFError:
                 break
             except KeyboardInterrupt:
-                self.say("Cancelled. Ready for your next message.")
+                self.console.print("Cancelled. Ready for your next message.", style="dim yellow", markup=False)
             except GMIError as error:
                 self.console.print(f"Error: {error}", style="red", markup=False)
             except OSError:

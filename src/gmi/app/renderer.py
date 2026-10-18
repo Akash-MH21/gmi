@@ -26,6 +26,10 @@ def render_reply(console, key, payload):
                         if content:
                             text += content
                             live.update(Markdown(text, code_theme="monokai"))
+            except KeyboardInterrupt:
+                # Remove the waiting row if no reply has arrived yet.
+                live.transient = not text
+                raise
             finally:
                 live.update(Markdown(text) if text else Text(""), refresh=True)
     finally:
@@ -38,4 +42,4 @@ def status(console, model, usage, elapsed):
     incoming = usage.get("prompt_tokens")
     outgoing = usage.get("completion_tokens")
     console.print(f"{model} | tokens in {incoming if incoming is not None else 'unknown'}, "
-                  f"out {outgoing if outgoing is not None else 'unknown'} | {elapsed:.2f}s", style="dim", markup=False)
+                  f"out {outgoing if outgoing is not None else 'unknown'} | {elapsed:.2f}s", style="dim grey62", markup=False)
