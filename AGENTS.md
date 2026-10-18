@@ -62,13 +62,18 @@ Codex CLI or kiro-cli work: you stay in it, type messages, and steer it with sla
 subcommands (`gmi chat "..."`, `gmi models --json`, ...) stay for scripts and CI, but the session is
 what people see first and what the demos show.
 
-## The one model rule (operator instruction, strict)
+## Models (operator instruction, 18 Oct, replaces the earlier one model rule)
 
-**`openai/gpt-6.1-sol` is the only model this project uses.** It is the CLI's built-in default, the model
-every live test calls, and the only model any example, README or help text names. Do not call any
-other model, not even to probe or test, and never fall back to one automatically. Overload advice says
-to wait and retry, not to switch models. Users can still pass any `--model` themselves. That is their choice,
-not ours.
+- **Building:** this repo is written by Codex running `openai/gpt-6.1-sol` on GMI Cloud. That is fixed in
+  the builder config and is not something the code controls.
+- **The product:** `gmi` supports every model GMI Cloud serves through its API: text, image, video, audio
+  and anything else in the catalogue. Never hard-code a list of allowed models. Read what is available from
+  the API (`GET /v1/models` for text, and the media model listings) and let the user pick any of them.
+- The built-in default chat model stays `openai/gpt-6.1-sol`. Media commands have sensible per-type defaults
+  that the user can override and save with `gmi config set`.
+- Tests: keep live calls tiny and cheap. Chat tests use `openai/gpt-6.1-sol` with `max_tokens` <= 16. Media tests
+  make one small generation per type with the cheapest suitable model, and are marked `live_media` so they
+  can be skipped.
 
 ## Conventions
 
