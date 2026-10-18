@@ -22,4 +22,4 @@ where = ["src"]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-markers = ["live: calls the real GMI API (requires GMI_API_KEY)"]
+markers = ["live: calls the real GMI API (requires GMI_API_KEY)", "live_media: generates small media artifacts (requires GMI_API_KEY)"]

@@ -33,9 +33,10 @@ def read_config():
         key = values.get("api_key")
         if key is not None and not isinstance(key, str):
             raise GMIError("Invalid config; run gmi auth login --stdin to replace it.")
-        default_model = values.get("default_model")
-        if default_model is not None and not isinstance(default_model, str):
-            raise GMIError("Invalid config; run gmi config set default_model <id> to replace it.")
+        for name in ("default_model", "default_image_model", "default_video_model", "default_audio_model"):
+            value = values.get(name)
+            if value is not None and not isinstance(value, str):
+                raise GMIError(f"Invalid config; run gmi config set {name} <id> to replace it.")
         return values
     except FileNotFoundError:
         return {}
@@ -62,7 +63,7 @@ def save_key(key):
     save_config(api_key=key)
 
 
-def save_config(api_key=None, default_model=None, unset_default=False):
+def save_config(api_key=None, default_model=None, unset_default=False, **settings):
     path = config_path()
     temporary = None
     try:
@@ -73,10 +74,13 @@ def save_config(api_key=None, default_model=None, unset_default=False):
             current.pop("default_model", None)
         elif default_model is not None:
             current["default_model"] = default_model
+        for name, value in settings.items():
+            if value is not None:
+                current[name] = value
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         fd, temporary = tempfile.mkstemp(dir=path.parent, prefix=".config-")
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            for name in ("api_key", "default_model"):
+            for name in ("api_key", "default_model", "default_image_model", "default_video_model", "default_audio_model"):
                 if name in current:
                     # JSON string escaping is compatible with TOML basic strings.
                     handle.write(name + " = " + json.dumps(current[name], ensure_ascii=False) + "\n")

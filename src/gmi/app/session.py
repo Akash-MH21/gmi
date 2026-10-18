@@ -82,6 +82,26 @@ class Session:
         from .picker import pick_model
         return pick_model(self.model_records(), self.state.model)
 
+    def media_records(self, refresh=False):
+        from ..media import MediaClient
+        client = MediaClient(self.key())
+        try: return client.catalogue(refresh=refresh)["models"]
+        finally: client.close()
+
+    def run_media(self, kind, argument):
+        from ..cli import _media_run
+        parts = argument.split()
+        if not parts: raise GMIError(f"Usage: /{kind} <prompt> [key=value ...]")
+        model = None
+        kept = []
+        index = 0
+        while index < len(parts):
+            if parts[index] == "--model" and index + 1 < len(parts): model = parts[index + 1]; index += 2; continue
+            kept.append(parts[index]); index += 1
+        extras = [item for item in kept if "=" in item]
+        prompt = " ".join(item for item in kept if "=" not in item)
+        _media_run(kind, prompt, model, extras, "gmi-output", self.key(), False)
+
     def pick(self, label, choices):
         if not choices:
             self.say("No entries available.")

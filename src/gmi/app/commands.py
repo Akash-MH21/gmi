@@ -95,6 +95,32 @@ def models(app, argument):
     app.say(model_table(records, app.state.model))
 
 
+@registry.command("media", "Browse image, video, and audio models")
+def media_command(app, argument):
+    records = app.media_records()
+    kind = argument.strip() if argument.strip() in ("image", "video", "audio") else None
+    if kind:
+        records = [r for r in records if r.get("model_type") == kind]
+    from ..media import price_info
+    for record in records:
+        app.say(f"{record.get('model')}  {record.get('model_type')}  {price_info(record)}")
+
+
+@registry.command("image", "Generate an image; local media paths are unsupported")
+def image(app, argument):
+    app.run_media("image", argument)
+
+
+@registry.command("video", "Generate a video; local media paths are unsupported")
+def video(app, argument):
+    app.run_media("video", argument)
+
+
+@registry.command("audio", "Generate speech or music; local media paths are unsupported")
+def audio(app, argument):
+    app.run_media("audio", argument)
+
+
 @registry.command("system", "Show, set, or clear the system prompt")
 def system(app, argument):
     if argument:

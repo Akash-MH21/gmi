@@ -12,6 +12,7 @@ import click
 from . import __version__, api
 from .config import (BUILTIN_DEFAULT_MODEL, GMIError, config_path, mask_key,
                      read_config, resolve_key, resolve_model, save_config, save_key)
+from . import media
 
 
 def options(function):
@@ -214,11 +215,11 @@ def config():
 
 
 @config.command("get")
-@click.argument("name", type=click.Choice(["default_model"]))
+@click.argument("name", type=click.Choice(["default_model", "default_image_model", "default_video_model", "default_audio_model"]))
 @options
 def config_get(api_key, as_json, name):
     """Print a setting."""
-    value = read_config().get(name) or BUILTIN_DEFAULT_MODEL
+    value = read_config().get(name) or (BUILTIN_DEFAULT_MODEL if name == "default_model" else "(auto)")
     if as_json:
         emit({name: value})
     else:
@@ -226,14 +227,88 @@ def config_get(api_key, as_json, name):
 
 
 @config.command("set")
-@click.argument("name", type=click.Choice(["default_model"]))
+@click.argument("name", type=click.Choice(["default_model", "default_image_model", "default_video_model", "default_audio_model"]))
 @click.argument("value")
 @options
 def config_set(api_key, as_json, name, value):
     """Save a setting."""
-    save_config(default_model=value)
+    save_config(**{name: value})
     result = {name: value}
     emit(result) if as_json else click.echo(f"Set {name} to {value}.")
+
+
+def _media_run(kind, prompt, model_id, params, output, key, as_json=False, refresh=False):
+    client = media.MediaClient(key)
+    request_id = "unknown"
+    try:
+        records = client.catalogue(refresh=refresh)["models"]
+        candidates = [r for r in records if r.get("model_type") == kind and media.usable(r, kind)]
+        selected = model_id or read_config().get("default_" + kind + "_model")
+        record = next((r for r in candidates if r.get("model") == selected), None) if selected else None
+        if selected and not record: raise GMIError(f"No active {kind} model named {selected}.")
+        if not record:
+            if not candidates: raise GMIError(f"No active {kind} models are available.")
+            record = min(candidates, key=lambda r: float((r.get("price_info") or {}).get("price", 10**30)))
+        extras = dict(item.split("=", 1) for item in params if "=" in item)
+        if len(extras) != len(params): raise GMIError("Parameters must use key=value.")
+        payload = media.build_payload(record, prompt, extras)
+        submitted = client.submit(record["model"], payload); request_id = submitted.get("request_id", "unknown")
+        if as_json:
+            emit({"request_id": request_id, "model": record["model"], "price": media.price_info(record)}); return
+        click.echo(f"Submitted {record['model']} ({media.price_info(record)}). Request: {request_id}")
+        result = client.poll(request_id, on_status=lambda state, elapsed: click.echo(f"{state} ({elapsed:.0f}s)", err=True))
+        for path in client.download(result.get("outcome") or {}, output, record["model"]): click.echo(str(path))
+    except KeyboardInterrupt:
+        raise GMIError(f"Stopped waiting. Request id: {request_id}. Resume with gmi media get {request_id}.") from None
+    finally: client.close()
+
+
+@main.group("media")
+def media_group():
+    """Browse and run image, video, and audio models."""
+
+
+@media_group.command("models")
+@click.option("--type", "model_type")
+@click.option("--refresh", is_flag=True)
+@options
+def media_models(api_key, as_json, model_type, refresh):
+    records = media.MediaClient(resolve_key(api_key)).catalogue(refresh=refresh)["models"]
+    if model_type: records = [r for r in records if r.get("model_type") == model_type]
+    if as_json: emit({"models": records})
+    else:
+        for record in records: click.echo(f"{record.get('model')}  {record.get('model_type')}  {media.price_info(record)}")
+
+
+@media_group.command("get")
+@click.argument("request_id")
+@options
+def media_get(api_key, as_json, request_id):
+    client = media.MediaClient(resolve_key(api_key))
+    try:
+        result = client.poll(request_id, on_status=lambda state, elapsed: click.echo(f"{state} ({elapsed:.0f}s)", err=True))
+        paths = client.download(result.get("outcome") or {})
+        if as_json: emit({"request_id": request_id, "paths": [str(p) for p in paths]})
+        else:
+            for path in paths: click.echo(str(path))
+    finally: client.close()
+
+
+def _register_media_command(kind):
+    @main.command(kind)
+    @click.argument("prompt")
+    @click.option("--model")
+    @click.option("--param", "params", multiple=True)
+    @click.option("--out", "output", default="gmi-output")
+    @click.option("--refresh", is_flag=True)
+    @options
+    def command(api_key, as_json, prompt, model, params, output, refresh):
+        return _media_run(kind, prompt, model, params, output, resolve_key(api_key), as_json, refresh)
+    command.__doc__ = "Generate media. Local media files are unsupported; use URLs for media parameters."
+
+
+for _kind in ("image", "video", "audio"):
+    _register_media_command(_kind)
 
 
 @main.command()
