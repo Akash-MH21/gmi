@@ -133,3 +133,35 @@ def drive_app(home, transcript=None):
 
 def test_live_interactive_app(tmp_path):
     drive_app(tmp_path)
+
+
+def test_live_cancelled_stream_has_one_partial_reply(tmp_path):
+    """Ctrl+C removes Rich's live frame before printing the partial reply."""
+    env = {**os.environ, 'HOME': str(tmp_path), 'TERM': 'xterm-256color',
+           'PROMPT_TOOLKIT_NO_CPR': '1', 'GMI_MODEL': 'openai/gpt-6.1-sol'}
+    child = pexpect.spawn(str(Path(sys.executable).parent / 'gmi'),
+                          ['chat', '--max-tokens', '16'], env=env, encoding='utf-8',
+                          timeout=180, dimensions=(40, 120))
+    terminal = Terminal()
+    child.logfile_read = terminal
+    try:
+        child.expect('/help for commands')
+        child.expect('gmi>')
+        child.sendline('Write a 600 word essay about clouds. Begin with CLOUD_REPLY_MARKER.')
+        child.expect('Waiting for reply')
+        # Wait for the first generated text before interrupting the stream.
+        child.expect('CLOUD_REPLY_MARKER', timeout=30)
+        child.sendcontrol('c')
+        child.expect('Cancelled. Ready for your next message.', timeout=10)
+        settle(child)
+
+        screen = terminal.screen.display
+        nonempty = [line.rstrip() for line in screen if line.strip()]
+        assert all(left != right for left, right in zip(nonempty, nonempty[1:]))
+        cancelled = next(i for i, line in enumerate(screen)
+                         if 'Cancelled. Ready for your next message.' in line)
+        partial = next(i for i, line in enumerate(screen[:cancelled])
+                       if 'CLOUD_REPLY_MARKER' in line)
+        assert partial < cancelled
+    finally:
+        child.close(force=True)

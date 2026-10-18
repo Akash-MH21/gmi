@@ -13,6 +13,7 @@ def render_reply(console, key, payload):
     started = time.monotonic()
     text = ""
     usage = None
+    cancelled = False
     events = api.stream_events(key, {**payload, "stream": True, "stream_options": {"include_usage": True}}, retry=False)
     try:
         with Live(Spinner("dots", text="Waiting for reply"), console=console,
@@ -27,11 +28,14 @@ def render_reply(console, key, payload):
                             text += content
                             live.update(Markdown(text, code_theme="monokai"))
             except KeyboardInterrupt:
-                # Remove the waiting row if no reply has arrived yet.
-                live.transient = not text
-                raise
+                # Clear the live frame before printing the partial reply once.
+                cancelled = True
+                live.transient = True
             finally:
-                live.update(Markdown(text) if text else Text(""), refresh=True)
+                if not cancelled:
+                    live.update(Markdown(text) if text else Text(""), refresh=True)
+        if cancelled:
+            raise KeyboardInterrupt
     finally:
         events.close()
     return text, usage, time.monotonic() - started
