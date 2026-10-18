@@ -55,6 +55,13 @@ be finished the day before.
   a per-sandbox `X-Access-Token` for its data plane. The Cluster Engine spec declares session-token auth only.
   Whether an API key works there is still an open question with GMI.
 
+## The interactive app is the product (operator, 2026-10-18)
+
+Running `gmi` with no arguments opens an interactive session in the terminal, the way Claude Code,
+Codex CLI or kiro-cli work: you stay in it, type messages, and steer it with slash commands. The
+subcommands (`gmi chat "..."`, `gmi models --json`, ...) stay for scripts and CI, but the session is
+what people see first and what the demos show.
+
 ## The one model rule (operator instruction, strict)
 
 **`openai/gpt-6.1-sol` is the only model this project uses.** It is the CLI's built-in default, the model
