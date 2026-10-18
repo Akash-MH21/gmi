@@ -33,7 +33,7 @@ def emit(value):
     click.echo(json.dumps(value, ensure_ascii=False))
 
 
-@click.group()
+@click.group(invoke_without_command=True)
 @click.version_option(__version__)
 @click.option("--api-key", help="API key; overrides environment and config.")
 @click.option("--json", "as_json", is_flag=True, help="Print JSON without prompts.")
@@ -41,6 +41,14 @@ def emit(value):
 def main(ctx, api_key, as_json):
     """Use GMI Cloud from the shell."""
     ctx.obj = {"api_key": api_key, "as_json": as_json}
+    if ctx.invoked_subcommand is None:
+        if as_json:
+            raise click.ClickException("Provide a command with --json; interactive sessions require a terminal.")
+        from .app.session import run_session
+        try:
+            run_session(api_key=api_key)
+        except GMIError as error:
+            raise click.ClickException(str(error)) from None
 
 
 @main.group()
@@ -63,10 +71,16 @@ def login(api_key, as_json, from_stdin):
         key = click.prompt("GMI API key", hide_input=True).strip()
     if not key or any(char.isspace() for char in key):
         raise GMIError("Provide one non-empty API key with no whitespace.")
-    api.models(key)
-    save_key(key)
+    verify_and_save_key(key)
     result = {"authenticated": True, "key": mask_key(key)}
     emit(result) if as_json else click.echo(f"Saved verified API key {result['key']}.")
+
+
+def verify_and_save_key(key):
+    if not key or any(char.isspace() for char in key):
+        raise GMIError("Provide one non-empty API key with no whitespace.")
+    api.models(key)
+    save_key(key)
 
 
 @auth.command()
@@ -233,8 +247,11 @@ def config_set(api_key, as_json, name, value):
 @options
 def chat(api_key, as_json, prompt, no_stream, model, system, max_tokens, no_retry, no_wrap):
     """Send a prompt, appending standard input when piped."""
-    key = resolve_key(api_key)
     model = resolve_model(model)
+    if not prompt and sys.stdin.isatty() and not as_json:
+        from .app.session import run_session
+        return run_session(api_key=api_key, model=model, system=system, max_tokens=max_tokens)
+    key = resolve_key(api_key)
     if not sys.stdin.isatty():
         extra = sys.stdin.read().strip()
         prompt = "\n\n".join(part for part in (prompt, extra) if part)

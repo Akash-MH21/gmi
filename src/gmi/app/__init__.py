@@ -1,0 +1,1 @@
+"""Inline interactive GMI application."""

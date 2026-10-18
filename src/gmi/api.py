@@ -100,7 +100,8 @@ def sse_events(lines):
         yield "\n".join(data)
 
 
-def stream(key, payload, retry=True):
+def stream_events(key, payload, retry=True):
+    """Yield complete stream chunks, including the API's usage event."""
     with client(key) as connection:
         for attempt in range(3):
             with connection.stream("POST", "chat/completions", json=payload) as response:
@@ -115,8 +116,13 @@ def stream(key, payload, retry=True):
                     chunk = json.loads(event)
                     if "error" in chunk:
                         raise GMIError("GMI reported a stream error; retry or check your account quota.")
-                    for choice in chunk.get("choices", []):
-                        content = choice.get("delta", {}).get("content")
-                        if content:
-                            yield content
+                    yield chunk
                 return
+
+
+def stream(key, payload, retry=True):
+    for chunk in stream_events(key, payload, retry):
+        for choice in chunk.get("choices", []):
+            content = choice.get("delta", {}).get("content")
+            if content:
+                yield content

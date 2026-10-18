@@ -17,6 +17,31 @@ gmi auth login
 ## Quick start
 
 ```sh
+gmi
+```
+
+The inline session stays in your terminal scrollback after exit. Use `/login`
+to verify and save a key, then type a message. `gmi chat` also opens the session
+when run without a prompt. The default model is `openai/gpt-6.1-sol`.
+
+Enter sends. Alt+Enter or Shift+Enter inserts a newline (terminal support for
+Shift+Enter varies); a trailing backslash also continues onto another line.
+Up and down recall persistent input history. Ctrl+C cancels a reply or clears
+input; Ctrl+D or `/exit` quits. Replies render as streaming Markdown, followed
+by API token counts and elapsed time. Missing usage is shown as unknown.
+
+Type `/` for command completions and Tab to complete. Use `/model` for a
+searchable live model picker, `/model <id>` to switch while keeping messages,
+and `/models sol` to filter the models table. `/system <text>` sets instructions,
+`/system clear` removes them, and `/clear` starts a new conversation.
+`/save [name]` and `/load [name]` use `~/.config/gmi/sessions/`; `/load` without
+a name opens a picker. `/usage` shows API token totals for the running session,
+including calls before `/clear` or `/load`. `/help` lists all commands.
+History is stored in `~/.config/gmi/history`.
+
+Script commands remain available:
+
+```sh
 gmi auth login
 gmi auth status
 gmi auth logout --yes
@@ -36,7 +61,7 @@ The built-in default model is `openai/gpt-6.1-sol`.
 ## Status this week
 
 - [x] Day 1: `gmi auth login`, `gmi models`, and `gmi chat`
-- [ ] Interactive chat with `/model`
+- [x] Interactive chat with `/model`
 - [ ] Image, video, and audio requests
 - [ ] Generated full API coverage from GMI's four OpenAPI specs
 - [ ] `gmi sandbox` on AgentBox
