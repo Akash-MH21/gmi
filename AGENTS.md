@@ -16,7 +16,8 @@ The full plan, all committed:
 2. Interactive `gmi chat` with slash commands: `/model`, `/models`, `/system`,
    `/clear`, `/save`, `/load`, `/help`, `/exit`.
 3. Full API coverage generated from GMI's four published OpenAPI specs
-   (63 paths, 95 operations: IAM 30, Cluster Engine 41, Sandbox 23, IDC 1).
+   (63 paths, 93 operations: IAM 30, Cluster Engine 41, Sandbox 21, IDC 1).
+   These counts change when GMI updates the specs, so recount before quoting them.
 4. `gmi sandbox` (GMI calls this AgentBox): create, exec, push/pull files, extend TTL, kill.
 5. `gmi mcp serve` (every operation as an MCP tool) and `gmi mcp login` to `mcp.gmicloud.ai/mcp`.
 6. Published as an agent on the AgentBox marketplace.
@@ -59,8 +60,8 @@ be finished the day before.
 
 - Base: `https://console.gmicloud.ai/api/v1/ie/requestqueue/apikey`, same `Authorization: Bearer <API key>`,
   same User-Agent rule as inference.
-- `GET /models` returns `{"model_ids": [...]}`: 377 ids today, and **many are junk or internal** (ids
-  containing `capture`, `probe`, `ssrf`, `test`, bare UUIDs, an empty string). Never show them blindly.
+- `GET /models` returns `{"model_ids": [...]}` and includes internal and test entries. Filter on
+  `status == "active"` and visible `model_metadata.visibility`, and never show the raw list.
 - `GET /models/{id}` returns the real record: `model`, `display_name`, `brief_description`,
   `model_type` (`image`, `video`, `audio`, `language`, ...), `status` (`active` or `inactive`),
   `model_metadata.visibility`, `modalities.input` / `modalities.output` (lists of `{type, required}`),
@@ -74,15 +75,18 @@ be finished the day before.
   `outcome` with artifact URLs (for example `video_url`, `thumbnail_image_url`; images and audio use
   their own keys, so read whatever URL fields the outcome holds).
 - The queue is shared per account: running music and speech at once starves speech.
+- The inference key used to build this project has scope `ie_model` and is rejected (HTTP 401
+  "Invalid API key") by the Sandbox and Cluster Engine APIs, so those need a different key type.
+  Ask GMI before relying on them.
 
-## The interactive app is the product (operator, 2026-10-18)
+## The interactive app is the product (project owner, 2026-10-18)
 
 Running `gmi` with no arguments opens an interactive session in the terminal, the way Claude Code,
 Codex CLI or kiro-cli work: you stay in it, type messages, and steer it with slash commands. The
 subcommands (`gmi chat "..."`, `gmi models --json`, ...) stay for scripts and CI, but the session is
 what people see first and what the demos show.
 
-## Models (operator instruction, 18 Oct, replaces the earlier one model rule)
+## Models (project owner instruction, 18 Oct, replaces the earlier one model rule)
 
 - **Building:** this repo is written by Codex running `openai/gpt-6.1-sol` on GMI Cloud. That is fixed in
   the builder config and is not something the code controls.
