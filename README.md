@@ -61,7 +61,7 @@ The built-in default model is `openai/gpt-6.1-sol`.
 ## Status this week
 
 - [x] Day 1: `gmi auth login`, `gmi models`, and `gmi chat`
-- [ ] Interactive chat with `/model`
+- [x] Interactive chat with `/model`
 - [ ] Image, video, and audio requests
 - [ ] Generated full API coverage from GMI's four OpenAPI specs
 - [ ] `gmi sandbox` on AgentBox
