@@ -70,6 +70,19 @@ def model(app, argument):
     if not argument:
         argument = app.pick_model()
     if argument:
+        model_records = getattr(app, "model_records", None)
+        if model_records is not None:
+            try:
+                records = model_records()
+            except GMIError:
+                app.console.print("could not verify this model id", style="dim", markup=False)
+            else:
+                ids = [record.get("id", "") for record in records]
+                if argument not in ids:
+                    suggestion = get_close_matches(argument, ids, n=1, cutoff=0.6)
+                    hint = f" Did you mean {suggestion[0]}?" if suggestion else ""
+                    app.say(f"Unknown model {argument}.{hint} Use /model to pick one, or /models <text> to search.")
+                    return
         app.state.model = argument
         app.say(f"Active model: {argument}")
 

@@ -1,10 +1,12 @@
 """Terminal-independent command, conversation, and input checks."""
 
 import stat
+from io import StringIO
 from types import SimpleNamespace
 
 from prompt_toolkit.document import Document
 import pytest
+from rich.console import Console
 
 from gmi.app.commands import Registry, SlashCompleter, parse_command, registry
 from gmi.app.state import Conversation, Usage, session_path
@@ -93,6 +95,31 @@ def test_save_load_and_model_switch(tmp_path, monkeypatch):
     with pytest.raises(GMIError, match='Cannot load'):
         state.load('broken')
     assert state.messages == restored.messages
+
+
+def test_model_rejects_unknown_id_and_suggests_close_match():
+    output = StringIO()
+    console = Console(file=output, force_terminal=False)
+    state = Conversation(model=BUILTIN_DEFAULT_MODEL)
+    app = SimpleNamespace(state=state, console=console,
+                          say=lambda text: console.print(text, markup=False),
+                          model_records=lambda: [{'id': BUILTIN_DEFAULT_MODEL}])
+    registry.dispatch(app, '/model openai/gpt-6.1-solx')
+    assert state.model == BUILTIN_DEFAULT_MODEL
+    assert 'Unknown model openai/gpt-6.1-solx.' in output.getvalue()
+    assert 'Did you mean openai/gpt-6.1-sol?' in output.getvalue()
+
+
+def test_model_accepts_id_when_models_cannot_be_fetched():
+    output = StringIO()
+    console = Console(file=output, force_terminal=False)
+    state = Conversation(model=BUILTIN_DEFAULT_MODEL)
+    app = SimpleNamespace(state=state, console=console,
+                          say=lambda text: console.print(text, markup=False),
+                          model_records=lambda: (_ for _ in ()).throw(GMIError('network')))
+    registry.dispatch(app, '/model custom/provider-model')
+    assert state.model == 'custom/provider-model'
+    assert 'could not verify this model id' in output.getvalue()
 
 
 def test_usage_only_counts_api_numbers():

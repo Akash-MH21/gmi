@@ -32,6 +32,8 @@ def check_response(response, model="<unknown>"):
         if is_overloaded(response):
             raise GMIError(f"Model {model} is overloaded on GMI right now. Wait a minute and retry.")
         raise GMIError("Rate limit reached (429); wait and retry or check your quota.")
+    if status == 404:
+        raise GMIError(f"Model {model} was not found on GMI. Check the id with: gmi models --search <text>")
     if status >= 400:
         raise GMIError(f"GMI API returned HTTP {status}; check your request and account access.")
 

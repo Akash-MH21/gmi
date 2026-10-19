@@ -92,11 +92,13 @@ def test_sse_parser():
     assert list(sse_events(["data:tail"])) == ["tail"]
 
 
-@pytest.mark.parametrize("status,match", [(401, "API key rejected"), (429, "wait and retry"), (503, "HTTP 503")])
+@pytest.mark.parametrize("status,match", [(401, "API key rejected"),
+                                          (404, "Model test/model was not found on GMI"),
+                                          (429, "wait and retry"), (503, "HTTP 503")])
 def test_status_error_formatting(status, match):
     # Exercise only the status formatter, with no HTTP request or mock transport.
     with pytest.raises(GMIError, match=match):
-        check_response(httpx.Response(status))
+        check_response(httpx.Response(status), "test/model")
 
 
 def test_429_classification():
