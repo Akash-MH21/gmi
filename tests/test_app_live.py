@@ -1,6 +1,7 @@
 """Drive the installed application through a real pseudo-terminal and live API."""
 
 import os
+from io import StringIO
 from pathlib import Path
 import sys
 import time
@@ -32,13 +33,20 @@ class Terminal:
 
 def settle(child):
     """Render pending terminal updates, with a bounded idle timeout."""
-    deadline = time.monotonic() + 5
+    # pexpect only drains the PTY while expect/read is called.  Asking it to
+    # expect TIMEOUT gives the screen a short chance to consume pending writes.
+    child.expect(pexpect.TIMEOUT, timeout=0.5)
+
+
+def wait_for_streamed_marker(child, terminal, marker):
+    """Wait for marker text rendered by Rich, after the echoed input."""
+    deadline = time.monotonic() + 30
     while time.monotonic() < deadline:
-        try:
-            child.read_nonblocking(65536, timeout=0.3)
-        except pexpect.TIMEOUT:
+        child.expect(pexpect.TIMEOUT, timeout=0.5)
+        if any(marker in line and not line.lstrip().startswith('gmi>')
+               for line in terminal.screen.display):
             return
-    pytest.fail('Terminal did not settle within five seconds')
+    pytest.fail('stream did not render the first reply text')
 
 
 def drive_app(home, transcript=None):
@@ -52,7 +60,7 @@ def drive_app(home, transcript=None):
     child.logfile_read = terminal
     try:
         child.expect('/help for commands')
-        child.expect('gmi>')
+        child.expect(r'gmi> ')
         screen = terminal.screen.display
         top = next(i for i, line in enumerate(screen) if line.startswith('╭'))
         assert screen[top + 5].startswith('╰')
@@ -78,6 +86,9 @@ def drive_app(home, transcript=None):
         assert screen[prompt_row + 1].startswith('> * openai/gpt-6.1-sol ')
         child.sendline('')
         child.expect('Active model: openai/gpt-6.1-sol')
+        child.expect('gmi>')
+        child.sendline('/model not-a-real-model')
+        child.expect('Unknown model not-a-real-model. Use /model to pick one, or /models <text> to search.')
         child.expect('gmi>')
         # Reopen from the session cache, cancel, then exercise no matches.
         child.sendline('/model')
@@ -132,17 +143,25 @@ def drive_app(home, transcript=None):
 
 
 def test_live_interactive_app(tmp_path):
-    drive_app(tmp_path)
+    for attempt in range(2):
+        transcript = StringIO()
+        try:
+            drive_app(tmp_path, transcript)
+            return
+        except (AssertionError, pexpect.TIMEOUT):
+            if attempt == 0 and any(word in transcript.getvalue().lower() for word in ('429', 'overloaded')):
+                continue
+            raise
 
 
-def test_live_cancelled_stream_has_one_partial_reply(tmp_path):
+def _run_cancelled_stream(tmp_path, transcript):
     """Ctrl+C removes Rich's live frame before printing the partial reply."""
     env = {**os.environ, 'HOME': str(tmp_path), 'TERM': 'xterm-256color',
            'PROMPT_TOOLKIT_NO_CPR': '1', 'GMI_MODEL': 'openai/gpt-6.1-sol'}
     child = pexpect.spawn(str(Path(sys.executable).parent / 'gmi'),
                           ['chat', '--max-tokens', '16'], env=env, encoding='utf-8',
                           timeout=180, dimensions=(40, 120))
-    terminal = Terminal()
+    terminal = Terminal(transcript)
     child.logfile_read = terminal
     try:
         child.expect('/help for commands')
@@ -150,7 +169,7 @@ def test_live_cancelled_stream_has_one_partial_reply(tmp_path):
         child.sendline('Write a 600 word essay about clouds. Begin with CLOUD_REPLY_MARKER.')
         child.expect('Waiting for reply')
         # Wait for the first generated text before interrupting the stream.
-        child.expect('CLOUD_REPLY_MARKER', timeout=30)
+        wait_for_streamed_marker(child, terminal, 'CLOUD_REPLY_MARKER')
         child.sendcontrol('c')
         child.expect('Cancelled. Ready for your next message.', timeout=10)
         settle(child)
@@ -165,3 +184,15 @@ def test_live_cancelled_stream_has_one_partial_reply(tmp_path):
         assert partial < cancelled
     finally:
         child.close(force=True)
+
+
+def test_live_cancelled_stream_has_one_partial_reply(tmp_path):
+    for attempt in range(2):
+        transcript = StringIO()
+        try:
+            _run_cancelled_stream(tmp_path, transcript)
+            return
+        except (AssertionError, pexpect.TIMEOUT):
+            if attempt == 0 and any(word in transcript.getvalue().lower() for word in ('429', 'overloaded')):
+                continue
+            raise
