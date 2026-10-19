@@ -40,13 +40,17 @@ def settle(child):
 
 def wait_for_streamed_marker(child, terminal, marker):
     """Wait for marker text rendered by Rich, after the echoed input."""
-    deadline = time.monotonic() + 30
+    # Live reasoning can delay the first visible token beyond 30 seconds.
+    # Allow the API client's 120-second read timeout before failing the test.
+    deadline = time.monotonic() + 120
     while time.monotonic() < deadline:
         child.expect(pexpect.TIMEOUT, timeout=0.5)
         if any(marker in line and not line.lstrip().startswith('gmi>')
                for line in terminal.screen.display):
             return
-    pytest.fail('stream did not render the first reply text')
+        errors = [line.strip() for line in terminal.screen.display if line.startswith('Error:')]
+        assert not errors, '\n'.join(errors)
+    raise AssertionError('stream did not render the first reply text')
 
 
 def drive_app(home, transcript=None):
@@ -194,5 +198,7 @@ def test_live_cancelled_stream_has_one_partial_reply(tmp_path):
             return
         except (AssertionError, pexpect.TIMEOUT):
             if attempt == 0 and any(word in transcript.getvalue().lower() for word in ('429', 'overloaded')):
+                # The live API asks for a minute before retrying an overload.
+                time.sleep(60)
                 continue
             raise
