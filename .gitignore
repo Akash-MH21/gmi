@@ -6,3 +6,4 @@ src/gmi.egg-info/
 dist/
 build/
 .env
+proof/
