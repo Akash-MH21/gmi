@@ -120,6 +120,12 @@ class Session:
             else:
                 buffer.start_completion(select_first=False)
 
+        @bindings.add("escape")
+        @bindings.add("c-c")
+        @bindings.add("c-d")
+        def cancel(event):
+            event.app.exit(result=None)
+
         picker = PromptSession(completer=WordCompleter(choices, ignore_case=True, match_middle=True),
                                complete_while_typing=True, key_bindings=bindings)
         return picker.prompt(f"{label} (type to filter, arrows to select): ",
