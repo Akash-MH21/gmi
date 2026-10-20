@@ -129,7 +129,7 @@ class MediaClient:
      wait_ms=limit_info.get('retry_after_ms'); when='unknown time'
      if wait_ms is not None: when=(datetime.now().astimezone()+timedelta(milliseconds=int(wait_ms))).strftime('%H:%M')
      model=body.get('model',getattr(self,'_model_for_error','the selected model'))
-     raise GMIError(f"Daily limit reached for {model}: {limit_info.get('limit','?')} requests per day (UTC). It resets at {when}. Try another model: gmi media models --type image")
+     raise GMIError(f"Daily limit reached for {model}: {limit_info.get('limit','?')} requests per day (UTC). It resets at {when}. Try another model: gmi media models --type {getattr(self,'media_type','image')}")
    except GMIError: raise
    except Exception:pass
    raise GMIError(f"Media API returned HTTP {response.status_code}{(': '+str(detail)) if detail else ''}")

@@ -239,6 +239,7 @@ def config_set(api_key, as_json, name, value):
 
 def _media_run(kind, prompt, model_id, params, output, key, as_json=False, refresh=False, yes=False, no_wait=False):
     client = media.MediaClient(key)
+    client.media_type = kind
     request_id = "unknown"
     try:
         records = client.catalogue(refresh=refresh)["models"]
