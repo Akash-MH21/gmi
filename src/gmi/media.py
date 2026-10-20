@@ -1,6 +1,6 @@
 """Catalogue and request queue support for GMI media models."""
 from __future__ import annotations
-import json, mimetypes, re, time
+import json, mimetypes, os, re, time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 from decimal import Decimal, InvalidOperation
@@ -23,6 +23,37 @@ def price_info(record):
  unit=str(info.get('unit') or 'unit').replace('per_','').replace('_',' ')
  unit = {'images': 'image', 'seconds': 'second', 'characters': 'character', 'requests': 'request'}.get(unit, unit)
  return f"{dollars} / {unit}"
+
+def _unit(record):
+ unit = str((record.get('price_info') or {}).get('unit') or 'unit').strip().lower().replace('_', ' ')
+ return unit
+
+def estimate_cost(record, params, prompt):
+ """Return (USD estimate or None, human-readable estimate text)."""
+ info = record.get('price_info') or {}
+ try: rate = Decimal(str(info.get('price'))) / Decimal(1000000)
+ except (InvalidOperation, TypeError, ValueError): return None, 'Cost unavailable'
+ unit = _unit(record)
+ if unit in {'image', 'images', 'generation', 'generations', 'video', 'videos', 'request', 'requests'} or unit.startswith('song'):
+  noun = unit.rstrip('s')
+  return float(rate), f"${rate:.4f} per {noun}"
+ if unit in {'second', 'seconds'}:
+  spec = next((p for p in (record.get('parameters') or []) if p.get('name') == 'duration'), {})
+  duration = (params or {}).get('duration', spec.get('default_value'))
+  if duration is None:
+   return None, f"${rate:.3f} / second, cost depends on duration"
+  try:
+   total = rate * Decimal(str(duration))
+   return float(total), f"${total:.4f} for {duration} seconds (${rate:.3f} / second)"
+  except (InvalidOperation, TypeError, ValueError):
+   return None, f"${rate:.3f} / second, cost depends on duration"
+ if unit in {'character', 'characters'}:
+  count = len(prompt or ''); total = rate * count
+  return float(total), f"${total:.4f} for {count} characters (${rate:.3f} / character)"
+ if unit in {'1k character', '1k characters', '1000 character', '1000 characters'}:
+  count = len(prompt or ''); total = rate * Decimal(count) / Decimal(1000)
+  return float(total), f"${total:.5f} for {count} characters (${rate:.2f} / 1k characters)"
+ return float(rate), f"${rate:.4f}"
 def grouped_models(records):
  groups={}
  for record in records: groups.setdefault(record.get('model_type','other'),[]).append(record)
@@ -69,7 +100,7 @@ def default_model(records,kind):
  def eligible(r):
   params=r.get('parameters') or []; prompts={p.get('name') for p in params if p.get('name') in PROMPT_NAMES}
   return bool(prompts) and all(not p.get('required') or p.get('name') in prompts or p.get('default_value') is not None for p in params)
- candidates=[r for r in candidates if eligible(r)] or candidates
+ candidates=[r for r in candidates if eligible(r)]
  return min(candidates,key=lambda r:Decimal(str((r.get('price_info') or {}).get('price','1e99')))) if candidates else None
 def cache_path(): return config_path().parent/'cache'/'media-models.json'
 def extract_urls(outcome):
@@ -84,13 +115,22 @@ def extract_urls(outcome):
  result=list(dict.fromkeys(found)); return result or list(dict.fromkeys(thumbs))
 class MediaClient:
  def __init__(self,key,transport=None):
-  self.key=key; self.client=transport or httpx.Client(base_url=BASE+'/',headers={'Authorization':f'Bearer {key}','User-Agent':f'gmi-cli/{__version__}'},timeout=120); self._owned=transport is None
+  self.key=key; self.client=transport or httpx.Client(base_url=os.environ.get('GMI_MEDIA_BASE_URL',BASE).rstrip('/')+'/',headers={'Authorization':f'Bearer {key}','User-Agent':f'gmi-cli/{__version__}'},timeout=120); self._owned=transport is None
  def close(self):
   if self._owned:self.client.close()
  def _response(self,response):
   if response.status_code>=400:
    detail=''
-   try:detail=response.json().get('error','')
+   try:
+    body=response.json(); detail=body.get('error','')
+    limit_info=body.get('rate_limit') or {}
+    if response.status_code == 429 and limit_info.get('type') == 'rate_limit_error' and limit_info.get('limit_type') == 'RPD':
+     from datetime import timedelta
+     wait_ms=limit_info.get('retry_after_ms'); when='unknown time'
+     if wait_ms is not None: when=(datetime.now().astimezone()+timedelta(milliseconds=int(wait_ms))).strftime('%H:%M')
+     model=body.get('model',getattr(self,'_model_for_error','the selected model'))
+     raise GMIError(f"Daily limit reached for {model}: {limit_info.get('limit','?')} requests per day (UTC). It resets at {when}. Try another model: gmi media models --type image")
+   except GMIError: raise
    except Exception:pass
    raise GMIError(f"Media API returned HTTP {response.status_code}{(': '+str(detail)) if detail else ''}")
   return response.json()
@@ -111,7 +151,9 @@ class MediaClient:
     except Exception:pass
     if progress:progress(n,len(ids))
   records.sort(key=lambda r:r.get('model','')); data={'models':records,'grouped':grouped_models(records),'fetched_at':datetime.now(timezone.utc).isoformat()}; path.parent.mkdir(parents=True,exist_ok=True,mode=0o700); path.write_text(json.dumps(data,ensure_ascii=False)); path.chmod(0o600); return data
- def submit(self,model,payload):return self._response(self.client.post('requests',json={'model':model,'payload':payload}))
+ def submit(self,model,payload):
+  self._model_for_error=model
+  return self._response(self.client.post('requests',json={'model':model,'payload':payload}))
  def _get_post(self,path,body): return self._response(self.client.post(path,json=body))
  def run(self,model,payload,timeout=600,on_status=None,sleep=time.sleep):
   for attempt in range(3):

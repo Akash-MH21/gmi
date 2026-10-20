@@ -252,35 +252,20 @@ def _media_run(kind, prompt, model_id, params, output, key, as_json=False, refre
         extras = dict(item.split("=", 1) for item in params if "=" in item)
         if len(extras) != len(params): raise GMIError("Parameters must use key=value.")
         payload = media.build_payload(record, prompt, extras)
-        price = media.price_info(record)
-        unit = str((record.get("price_info") or {}).get("unit", ""))
-        rate = float((record.get("price_info") or {}).get("price", 0)) / 1_000_000
-        estimate = rate
-        if "second" in unit:
-            try: estimate *= float(payload.get("duration", 1))
-            except (TypeError, ValueError): pass
-        elif "character" in unit:
-            estimate *= len(prompt)
-        if estimate >= 0.25 and not yes and not as_json:
-            if not click.confirm(f"Estimated cost ${estimate:.3f}. Continue?", default=False):
+        estimate, estimate_text = media.estimate_cost(record, payload, prompt)
+        if not as_json: click.echo(f"Price: {estimate_text}")
+        if estimate is not None and estimate >= 0.25 and not yes and not as_json:
+            if not click.confirm("Continue?", default=False):
                 raise GMIError("Cancelled.")
-        for attempt in range(3):
-            try:
-                submitted = client.submit(record["model"], payload)
-                break
-            except GMIError as error:
-                if "HTTP 500" not in str(error) or "Upstream provider temporarily unavailable" not in str(error) or attempt == 2:
-                    raise
-                import time
-                time.sleep(3 if attempt == 0 else 6)
+        submitted = client.submit(record["model"], payload) if no_wait else client.run(record["model"], payload, on_status=lambda state, elapsed: click.echo(f"{record['model']} {state} ({elapsed:.0f}s)", err=True))
         request_id = submitted.get("request_id") or submitted.get("id", "unknown")
-        if not as_json: click.echo(f"Model: {record['model']}\nPrice: {price}\nRequest: {request_id}")
+        if not as_json: click.echo(f"Model: {record['model']}\nRequest: {request_id}")
         if no_wait:
             result = submitted; paths = []
         elif submitted.get("status") in media.TERMINAL:
             result = submitted; paths = client.download(result.get("outcome") or {}, output, record["model"])
         else:
-            result = client.poll(request_id, on_status=lambda state, elapsed: click.echo(f"{record['model']} {state} ({elapsed:.0f}s)", err=True))
+            result = submitted
             paths = client.download(result.get("outcome") or {}, output, record["model"])
         if as_json:
             emit({"request_id": request_id, "model": record["model"], "status": result.get("status"), "outcome": result.get("outcome"), "saved_files": [str(p) for p in paths], "estimated_cost": estimate})
