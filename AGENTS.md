@@ -90,6 +90,9 @@ be finished the day before.
   and suggest trying another.
 - `GET /requests?limit=N&offset=M` lists your past requests: `{requests, total, limit, offset, has_more}`.
 - The queue is shared per account. Do not run several media jobs at once.
+- Price units on usable models today include `image`, `generation`, `second`, `video`, `request`, `character`, `1k character` and `song (up to 5 minutes)`. `price_info.price` is millionths of a USD per unit.
+- GMI enforces per-model daily limits. A daily limit response is HTTP 429 with a `rate_limit` object and a `Retry-After` header in seconds. The limit resets at 00:00 UTC. Daily limit responses are not retried.
+- An upstream outage returns HTTP 500 with `{"error":"Upstream provider temporarily unavailable; please try again later","request_id":"..."}`. GMI records the request as failed, so a retry is safe.
 
 ## The interactive app is the product (project owner, 2026-10-18)
 
