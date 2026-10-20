@@ -65,7 +65,7 @@ The built-in default model is `openai/gpt-6.1-sol`.
 
 - [x] Day 1: `gmi auth login`, `gmi models`, and `gmi chat`
 - [x] Interactive chat with `/model`
-- [x] Image, video, and audio requests
+- [x] Day 2: image, video, and audio requests
 - [ ] Generated full API coverage from GMI's four OpenAPI specs
 - [ ] `gmi sandbox` on AgentBox
 - [ ] `gmi mcp serve`
@@ -100,3 +100,20 @@ using at most 16 output tokens. Live tests do not use API mocks.
 ## License
 
 Apache-2.0. Community-built, not an official GMI Cloud product.
+
+## Media
+
+The media catalogue is fetched from GMI at runtime. It filters hidden entries, test entries and models without workers, then caches usable records for 24 hours. Prices are shown in dollars with their billing unit.
+
+```sh
+gmi media models --type image
+gmi image "a small red lighthouse on a cliff at dawn, flat illustration"
+gmi video "a paper boat drifting on a calm pond, soft morning light" --param duration=5
+gmi audio "gmi works"
+gmi media list --limit 20
+gmi media get REQUEST_ID --out ./gmi-output
+```
+
+Inside a session use `/image`, `/video`, `/audio` or `/media` to choose a model. The selected model is saved with `gmi config set default_image_model ID` and equivalent video and audio settings. `--model ID` overrides it for one call. Use `--json`, `--no-wait` or `--yes` in scripts. URL inputs are supported; local media files are not yet. Calls estimated at $0.25 or more ask `Continue? [y/N]` in the session.
+
+If a request stays queued, that model may have no workers. gmi only lists models with active workers. If GMI reports `Upstream provider temporarily unavailable`, gmi retries twice and then suggests trying another model.
