@@ -68,8 +68,8 @@ be finished the day before.
 - **`price_info.price` is millionths of a USD per `unit`** (per image, per second, per character, per request...).
   Example: 35000 per image is $0.035. Units vary by model, so always show the unit.
 - **A model only runs if `status == "active"` AND `qworkers > 0`.** A model with `qworkers == 0` stays `queued`
-  forever (observed: a request to one waited 5+ minutes and never started). Of the usable-looking models today,
-  roughly 40 percent have zero workers. There is no bulk endpoint for `qworkers`, so fetch details per model.
+  forever (observed: a request to one waited 5+ minutes and never started). Many catalogue entries have zero
+  workers at any given time. There is no bulk endpoint for `qworkers`, so fetch details per model.
 - `parameters[]` entries have `name`, `type` (`string`, `integer`, `float`, `boolean`, `enum`, `image`, `audio`,
   `video`, ...), `required`, `default_value` and, for enums, `options[]` of `{value, display_name}` (one voice list
   has 332 options, another 65). Some required parameters have a `default_value`; those can be auto-filled.
