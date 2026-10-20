@@ -85,7 +85,8 @@ class Session:
     def media_records(self, refresh=False):
         from ..media import MediaClient
         client = MediaClient(self.key())
-        try: return client.catalogue(refresh=refresh)["models"]
+        try:
+            return client.catalogue(refresh=refresh, progress=lambda done, total: self.say(f"Loading media models: {done}/{total}"))["models"]
         finally: client.close()
 
     def run_media(self, kind, argument):

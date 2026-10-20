@@ -98,12 +98,24 @@ def models(app, argument):
 @registry.command("media", "Browse image, video, and audio models")
 def media_command(app, argument):
     records = app.media_records()
-    kind = argument.strip() if argument.strip() in ("image", "video", "audio") else None
-    if kind:
-        records = [r for r in records if r.get("model_type") == kind]
+    kind = argument.strip().lower() if argument.strip().lower() in ("image", "video", "audio") else None
+    if not kind:
+        kind = app.pick("Media type", ["image", "video", "audio"])
+    if not kind:
+        return
+    records = [r for r in records if r.get("model_type") == kind]
     from ..media import price_info
-    for record in records:
-        app.say(f"{record.get('model')}  {record.get('model_type')}  {price_info(record)}")
+    from ..media import default_model
+    choices = [f"{r.get('model')}  {price_info(r)}" for r in records]
+    active = default_model(records, kind)
+    if active:
+        app.say(f"Active default: {active.get('model')} ({price_info(active)})")
+    selected = app.pick(f"{kind} model", choices)
+    if selected:
+        model_id = selected.split("  ", 1)[0]
+        from ..config import save_config
+        save_config(**{"default_" + kind + "_model": model_id})
+        app.say(f"Saved default {kind} model: {model_id}")
 
 
 @registry.command("image", "Generate an image; local media paths are unsupported")
