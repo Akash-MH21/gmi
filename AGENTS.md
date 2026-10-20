@@ -56,28 +56,40 @@ be finished the day before.
   a per-sandbox `X-Access-Token` for its data plane. The Cluster Engine spec declares session-token auth only.
   Whether an API key works there is still an open question with GMI.
 
-## Media API facts (verified live 2026-10-18)
+## Media API facts (verified live on 2026-10-20 with real generations)
 
-- Base: `https://console.gmicloud.ai/api/v1/ie/requestqueue/apikey`, same `Authorization: Bearer <API key>`,
-  same User-Agent rule as inference.
-- `GET /models` returns `{"model_ids": [...]}` and includes internal and test entries. Filter on
-  `status == "active"` and visible `model_metadata.visibility`, and never show the raw list.
-- `GET /models/{id}` returns the real record: `model`, `display_name`, `brief_description`,
-  `model_type` (`image`, `video`, `audio`, `language`, ...), `status` (`active` or `inactive`),
-  `model_metadata.visibility`, `modalities.input` / `modalities.output` (lists of `{type, required}`),
-  `price_info` `{pricing_type, price, unit}` where **`price` is in millionths of a USD** (seedream-5.0-pro
-  85000 per image = $0.085, minimax-tts-speech-2.8-turbo 60000 per 1k characters = $0.06,
-  kling-3.0-turbo-t2v 112000 per second = $0.112/s), and `parameters` (each with name, type, required,
-  plus enum options) that describe the request payload.
-- A model is usable when `status == "active"`, visibility is not hidden, and its output modality matches.
-- `POST /requests` with `{"model": id, "payload": {...}}` returns `request_id` and `status` (`dispatched`).
-  `GET /requests/{id}` gives `status` (dispatched, processing, success, failed, ...) and, on success,
-  `outcome` with artifact URLs (for example `video_url`, `thumbnail_image_url`; images and audio use
-  their own keys, so read whatever URL fields the outcome holds).
-- The queue is shared per account: running music and speech at once starves speech.
-- The inference key used to build this project has scope `ie_model` and is rejected (HTTP 401
-  "Invalid API key") by the Sandbox and Cluster Engine APIs, so those need a different key type.
-  Ask GMI before relying on them.
+- Base: `https://console.gmicloud.ai/api/v1/ie/requestqueue/apikey`. Same `Authorization: Bearer <API key>` and
+  the same explicit User-Agent rule as inference. Our inference key works here.
+- `GET /models` returns `{"model_ids": [...]}`. The list contains internal and test entries, so never show it raw.
+- `GET /models/{id}` is the real record: `model`, `display_name`, `model_type` (`image`, `video`, `audio`, `3d`,
+  `workflow`, `api`, `language`), `status`, `qworkers`, `model_metadata` (`visibility`, `delivery_mode` `sync` or
+  `async`), `modalities.input` and `.output` (lists of `{type, required}`), `price_info`
+  `{pricing_type, price, unit}`, and `parameters`.
+- **`price_info.price` is millionths of a USD per `unit`** (per image, per second, per character, per request...).
+  Example: 35000 per image is $0.035. Units vary by model, so always show the unit.
+- **A model only runs if `status == "active"` AND `qworkers > 0`.** A model with `qworkers == 0` stays `queued`
+  forever (observed: a request to one waited 5+ minutes and never started). Of the usable-looking models today,
+  roughly 40 percent have zero workers. There is no bulk endpoint for `qworkers`, so fetch details per model.
+- `parameters[]` entries have `name`, `type` (`string`, `integer`, `float`, `boolean`, `enum`, `image`, `audio`,
+  `video`, ...), `required`, `default_value` and, for enums, `options[]` of `{value, display_name}` (one voice list
+  has 332 options, another 65). Some required parameters have a `default_value`; those can be auto-filled.
+- `POST /requests` with `{"model": id, "payload": {...}}` returns HTTP 200 and the request record. **Sync models
+  finish inside the POST**: the response already has `status: "success"` and `outcome`. Async models return
+  `status: "queued"` and must be polled with `GET /requests/{request_id}`. Statuses seen: `queued`, `success`,
+  `failed`. Terminal means anything outside `queued`, `dispatched`, `processing`, `pending`, `running`.
+- Success `outcome` shapes (read every URL field that is present, de-duplicate):
+  - image: `{"media_urls": [{"id": "0", "url": ".../x.jpg"}], "thumbnail_image_url": "..."}` (a 2048 by 2048 JPEG).
+  - audio: `{"audio_url": ".../x.mp3", "media": [{"type": "audio", "url": ...}], "media_urls": [...],
+    "medias": [{"id", "request_id", "url"}], "status": "audio_generated_successfully", "usage": {...}}`.
+  - video: `{"video_url": "...", "thumbnail_image_url": "..."}` (per GMI docs; not yet run by us).
+  Artifact URLs are public storage links and download without any auth header.
+- **Upstream errors.** A provider outage returns HTTP 500 `{"error": "Upstream provider temporarily unavailable;
+  please try again later", "request_id": "..."}`. GMI records that request as `status: "failed"` with
+  `outcome.error {code, message}`, so nothing is running and one retry after a short wait is safe. Retry at most
+  twice, only for this error. The same model failed twice in a row while another provider worked, so say which model failed
+  and suggest trying another.
+- `GET /requests?limit=N&offset=M` lists your past requests: `{requests, total, limit, offset, has_more}`.
+- The queue is shared per account. Do not run several media jobs at once.
 
 ## The interactive app is the product (project owner, 2026-10-18)
 
