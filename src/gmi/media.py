@@ -1,173 +1,144 @@
-"""GMI media catalogue and asynchronous request queue client."""
+"""Catalogue and request queue support for GMI media models."""
 from __future__ import annotations
-
-import json
-import mimetypes
-import re
-import time
+import json, mimetypes, re, time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
-from decimal import Decimal
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from urllib.parse import urlparse
-
 import httpx
-
 from . import __version__
 from .config import GMIError, config_path
-
-BASE = "https://console.gmicloud.ai/api/v1/ie/requestqueue/apikey"
-JUNK_RE = re.compile(r"(?:capture|probe|ssrf|test)", re.I)
-PROMPT_NAMES = ("prompt", "text", "lyrics")
-
-
+BASE='https://console.gmicloud.ai/api/v1/ie/requestqueue/apikey'
+TERMINAL={'success','failed','error','cancelled','completed'}
+PROMPT_NAMES=('prompt','text','lyrics')
+JUNK_WORDS=re.compile(r'capture|probe|ssrf|test|hunt|bypass',re.I)
+UUID=re.compile(r'^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$',re.I)
 def filter_junk_ids(ids):
-    """Remove internal ids which the public catalogue endpoint exposes."""
-    result = []
-    for value in ids or []:
-        value = str(value)
-        if not value or JUNK_RE.search(value) or re.fullmatch(r"[0-9a-f]{8}-[0-9a-f-]{27,}", value, re.I):
-            continue
-        result.append(value)
-    return result
-
-
+ return [s for value in (ids or []) if (s:=str(value).strip()) and not JUNK_WORDS.search(s) and not UUID.fullmatch(s)]
 def price_info(record):
-    info = record.get("price_info") or {}
-    try:
-        dollars = Decimal(str(info.get("price", 0))) / Decimal(1_000_000)
-        price = f"${dollars:.3f}".rstrip("0").rstrip(".")
-    except Exception:
-        price = "-"
-    unit = str(info.get("unit") or "unit").replace("per_", "").replace("_", " ")
-    unit = {"image": "image", "second": "second", "seconds": "second", "1k characters": "1k characters"}.get(unit, unit)
-    return f"{price} / {unit}" if price != "-" else "-"
-
-
-def usable(record, output_type):
-    if record.get("status") != "active" or str((record.get("model_metadata") or {}).get("visibility", "")).lower() == "hidden":
-        return False
-    outputs = record.get("modalities", {}).get("output", [])
-    return any((x.get("type") if isinstance(x, dict) else x) == output_type for x in outputs)
-
-
+ info=record.get('price_info') or {}
+ try: dollars=f"${Decimal(str(info.get('price')))/Decimal(1000000):.3f}".rstrip('0').rstrip('.')
+ except (InvalidOperation,TypeError): return '-'
+ unit=str(info.get('unit') or 'unit').replace('per_','').replace('_',' ')
+ unit = {'images': 'image', 'seconds': 'second', 'characters': 'character', 'requests': 'request'}.get(unit, unit)
+ return f"{dollars} / {unit}"
 def grouped_models(records):
-    groups = {}
-    for record in records:
-        groups.setdefault(record.get("model_type", "other"), []).append(record)
-    return groups
-
-
-def build_payload(schema, prompt, extras=None):
-    extras = extras or {}
-    params = schema.get("parameters", schema if isinstance(schema, list) else []) or []
-    by_name = {p.get("name"): p for p in params if p.get("name")}
-    prompt_param = next((name for name in PROMPT_NAMES if name in by_name), None)
-    if not prompt_param:
-        prompt_param = next((name for name in PROMPT_NAMES if (by_name.get(name) or {}).get("required")), "prompt")
-    values = {prompt_param: prompt}
-    values.update(extras)
-    validate_payload(values, params)
-    return values
-
-
+ groups={}
+ for record in records: groups.setdefault(record.get('model_type','other'),[]).append(record)
+ return groups
+def usable(record, output_type=None):
+ if record.get('status')!='active' or int(record.get('qworkers') or 0)<=0:return False
+ if str((record.get('model_metadata') or {}).get('visibility','')).lower()=='hidden':return False
+ if output_type is None:return True
+ return any((x.get('type') if isinstance(x,dict) else x)==output_type for x in ((record.get('modalities') or {}).get('output') or []))
+def _specs(parameters): return {p.get('name'):p for p in (parameters or []) if p.get('name')}
 def _convert(value, typ):
-    if typ in ("integer", "int"): return int(value)
-    if typ in ("number", "float"): return float(value)
-    if typ in ("boolean", "bool"): return str(value).lower() in ("1", "true", "yes", "on")
-    return value
-
-
+ if typ in ('integer','int'):return int(value)
+ if typ in ('float','number'):return float(value)
+ if typ in ('boolean','bool'):
+  text=str(value).lower()
+  if text not in {'true','false','1','0','yes','no','on','off'}:raise ValueError
+  return text in {'true','1','yes','on'}
+ return value
 def validate_payload(payload, parameters):
-    params = parameters.get("parameters", parameters) if isinstance(parameters, dict) else parameters
-    params = params or []
-    specs = {p.get("name"): p for p in params if p.get("name")}
-    for p in params:
-        name = p.get("name")
-        if p.get("required") and name not in payload:
-            raise GMIError(f"Missing required parameter '{name}'.")
-    for name, value in payload.items():
-        spec = specs.get(name)
-        if not spec:
-            raise GMIError(f"Unknown parameter '{name}'. Valid parameters: {', '.join(specs) or '(prompt only)'}")
-        options = spec.get("enum") or spec.get("options")
-        if options and value not in options:
-            raise GMIError(f"Invalid value for {name}: {value}. Valid values: {', '.join(map(str, options))}")
-        typ = spec.get("type", "string")
-        if typ in ("integer", "number", "float", "boolean", "int", "bool"):
-            try: payload[name] = _convert(value, typ)
-            except (TypeError, ValueError): raise GMIError(f"Parameter {name} must be a {typ}.") from None
-        if isinstance(value, str) and (typ in ("image", "audio", "video") or name in ("image", "audio", "video", "image_url", "audio_url", "video_url")) and Path(value).exists():
-            raise GMIError(f"Local media files are not supported for '{name}' yet; provide a URL instead.")
-    return payload
-
-
-def cache_path():
-    return config_path().parent / "cache" / "media-models.json"
-
-
+ params=parameters.get('parameters',[]) if isinstance(parameters,dict) else parameters; specs=_specs(params)
+ for name,value in list(payload.items()):
+  spec=specs.get(name)
+  if not spec: raise GMIError(f"Unknown parameter '{name}'. Valid parameters: {', '.join(specs) or '(prompt only)'}")
+  typ=spec.get('type','string')
+  if typ in {'image','audio','video'} and isinstance(value,str) and not value.startswith(('http://','https://')): raise GMIError(f"Local media files are not supported for '{name}' yet; provide an http(s) URL.")
+  options=spec.get('options') or spec.get('enum') or []; option_values=[x.get('value') if isinstance(x,dict) else x for x in options]
+  try: converted=_convert(value,typ)
+  except (TypeError,ValueError): raise GMIError(f'Parameter {name} must be a {typ}.') from None
+  if option_values and converted not in option_values:
+   shown=', '.join(map(str,option_values[:10])); more=f' ({len(option_values)} total)' if len(option_values)>10 else ''
+   raise GMIError(f'Invalid value for {name}: {value}. Valid values: {shown}{more}')
+  payload[name]=converted
+ for name,spec in specs.items():
+  if spec.get('required') and name not in payload:
+   if 'default_value' in spec and spec.get('default_value') is not None: payload[name]=_convert(spec['default_value'],spec.get('type','string'))
+   else: raise GMIError(f"Missing required parameter '{name}'.")
+ return payload
+def build_payload(schema,prompt,extras=None):
+ parameters=schema.get('parameters',[]) if isinstance(schema,dict) else schema; specs=_specs(parameters); prompt_name=next((n for n in PROMPT_NAMES if n in specs),None)
+ if prompt_name is None: raise GMIError('This model has no supported prompt parameter (prompt, text or lyrics).')
+ payload={prompt_name:prompt}; payload.update(extras or {}); return validate_payload(payload,parameters)
+def default_model(records,kind):
+ candidates=[r for r in records if r.get('model_type')==kind and usable(r,kind)]
+ def eligible(r):
+  params=r.get('parameters') or []; prompts={p.get('name') for p in params if p.get('name') in PROMPT_NAMES}
+  return bool(prompts) and all(not p.get('required') or p.get('name') in prompts or p.get('default_value') is not None for p in params)
+ candidates=[r for r in candidates if eligible(r)] or candidates
+ return min(candidates,key=lambda r:Decimal(str((r.get('price_info') or {}).get('price','1e99')))) if candidates else None
+def cache_path(): return config_path().parent/'cache'/'media-models.json'
+def extract_urls(outcome):
+ found=[]; thumbs=[]
+ def add(v,thumb=False):
+  if isinstance(v,str) and v.startswith(('http://','https://')):(thumbs if thumb else found).append(v)
+ for key,value in (outcome or {}).items():
+  if key=='thumbnail_image_url':add(value,True)
+  elif key in {'audio_url','video_url'}:add(value)
+  elif key in {'media_urls','media','medias'} and isinstance(value,list):
+   for item in value:add(item.get('url') if isinstance(item,dict) else item)
+ result=list(dict.fromkeys(found)); return result or list(dict.fromkeys(thumbs))
 class MediaClient:
-    def __init__(self, key, transport=None):
-        self.key = key
-        self.client = transport or httpx.Client(base_url=BASE + "/", headers={"Authorization": f"Bearer {key}", "User-Agent": f"gmi-cli/{__version__}"}, timeout=120)
-        self._owned = transport is None
-
-    def close(self):
-        if self._owned: self.client.close()
-
-    def _get(self, path):
-        response = self.client.get(path)
-        if response.status_code >= 400: raise GMIError(f"Media API returned HTTP {response.status_code}; check your key and request.")
-        return response.json()
-
-    def catalogue(self, refresh=False):
-        path = cache_path()
-        if not refresh and path.exists() and time.time() - path.stat().st_mtime < 86400:
-            try: return json.loads(path.read_text())
-            except (OSError, ValueError): pass
-        ids = filter_junk_ids(self._get("models").get("model_ids", []))
-        records = []
-        with ThreadPoolExecutor(max_workers=8) as pool:
-            futures = {pool.submit(self._get, "models/" + model_id): model_id for model_id in ids}
-            for future in as_completed(futures):
-                try:
-                    record = future.result()
-                    if isinstance(record.get("data"), dict): record = record["data"]
-                    if record.get("model") and record.get("status") == "active" and str((record.get("model_metadata") or {}).get("visibility", "")).lower() != "hidden": records.append(record)
-                except Exception: continue
-        records.sort(key=lambda r: r.get("model", ""))
-        data = {"models": records, "grouped": grouped_models(records), "fetched_at": datetime.now(timezone.utc).isoformat()}
-        path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
-        path.write_text(json.dumps(data, ensure_ascii=False))
-        return data
-
-    def submit(self, model, payload):
-        value = self._get_post("requests", {"model": model, "payload": payload})
-        return value
-
-    def _get_post(self, path, body):
-        response = self.client.post(path, json=body)
-        if response.status_code >= 400: raise GMIError(f"Media API returned HTTP {response.status_code}; check your request.")
-        return response.json()
-
-    def poll(self, request_id, timeout=600, on_status=None, sleep=time.sleep):
-        started = time.monotonic(); delay = 1.0
-        while True:
-            result = self._get("requests/" + request_id); state = result.get("status", "unknown")
-            if on_status: on_status(state, time.monotonic() - started)
-            if state in ("success", "completed"): return result
-            if state in ("failed", "error", "cancelled"): raise GMIError(f"Media request {request_id} failed: {result.get('error') or result.get('message') or state}")
-            if time.monotonic() - started >= timeout: raise GMIError(f"Media request {request_id} timed out; resume with gmi media get {request_id}.")
-            sleep(delay); delay = min(delay * 1.5, 10)
-
-    def download(self, outcome, output_dir="gmi-output", model="media"):
-        urls = [v for v in outcome.values() if isinstance(v, str) and v.startswith(("http://", "https://"))]
-        directory = Path(output_dir); directory.mkdir(parents=True, exist_ok=True)
-        stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-        paths = []
-        for index, url in enumerate(urls):
-            response = self.client.get(url) if url.startswith(BASE) else httpx.get(url, timeout=120)
-            response.raise_for_status(); suffix = Path(urlparse(url).path).suffix or mimetypes.guess_extension(response.headers.get("content-type", "").split(";")[0]) or ".bin"
-            path = directory / f"{stamp}-{re.sub(r'[^A-Za-z0-9_.-]', '_', model)}{'' if index == 0 else f'-{index}'}{suffix}"; path.write_bytes(response.content); paths.append(path)
-        return paths
-
+ def __init__(self,key,transport=None):
+  self.key=key; self.client=transport or httpx.Client(base_url=BASE+'/',headers={'Authorization':f'Bearer {key}','User-Agent':f'gmi-cli/{__version__}'},timeout=120); self._owned=transport is None
+ def close(self):
+  if self._owned:self.client.close()
+ def _response(self,response):
+  if response.status_code>=400:
+   detail=''
+   try:detail=response.json().get('error','')
+   except Exception:pass
+   raise GMIError(f"Media API returned HTTP {response.status_code}{(': '+str(detail)) if detail else ''}")
+  return response.json()
+ def get(self,path):return self._response(self.client.get(path))
+ def _get(self,path): return self.get(path)
+ def catalogue(self,refresh=False,progress=None):
+  path=cache_path()
+  if not refresh and path.exists() and time.time()-path.stat().st_mtime<86400:
+   try:return json.loads(path.read_text())
+   except (OSError,ValueError):pass
+  ids=filter_junk_ids(self.get('models').get('model_ids',[])); records=[]
+  with ThreadPoolExecutor(max_workers=8) as pool:
+   futures={pool.submit(self.get,'models/'+i):i for i in ids}
+   for n,future in enumerate(as_completed(futures),1):
+    try:
+     record=future.result(); record=record.get('data',record) if isinstance(record,dict) else record
+     if record.get('model') and usable(record):records.append(record)
+    except Exception:pass
+    if progress:progress(n,len(ids))
+  records.sort(key=lambda r:r.get('model','')); data={'models':records,'grouped':grouped_models(records),'fetched_at':datetime.now(timezone.utc).isoformat()}; path.parent.mkdir(parents=True,exist_ok=True,mode=0o700); path.write_text(json.dumps(data,ensure_ascii=False)); path.chmod(0o600); return data
+ def submit(self,model,payload):return self._response(self.client.post('requests',json={'model':model,'payload':payload}))
+ def _get_post(self,path,body): return self._response(self.client.post(path,json=body))
+ def run(self,model,payload,timeout=600,on_status=None,sleep=time.sleep):
+  for attempt in range(3):
+   try:
+    result=self.submit(model,payload)
+    if result.get('status') in TERMINAL:return result
+    return self.poll(result.get('request_id') or result.get('id'),timeout,on_status,sleep)
+   except GMIError as error:
+    if 'HTTP 500' not in str(error) or 'Upstream provider temporarily unavailable' not in str(error) or attempt==2:raise
+    sleep(3 if attempt==0 else 6)
+ def poll(self,request_id,timeout=600,on_status=None,sleep=time.sleep):
+  started=time.monotonic(); delay=1.0
+  while True:
+   result=self.get('requests/'+request_id); state=result.get('status','unknown')
+   if on_status:on_status(state,time.monotonic()-started)
+   if state in TERMINAL:
+    if state=='failed':
+     error=(result.get('outcome') or {}).get('error') or result.get('error') or result.get('message') or 'unknown error'; raise GMIError(f"Media request {request_id} failed for model {result.get('model','')}: {error}")
+    return result
+   if time.monotonic()-started>=timeout:raise GMIError(f'Media request {request_id} timed out; resume with gmi media get {request_id}.')
+   sleep(delay); delay=min(delay*1.5,5)
+ def download(self,outcome,output_dir='gmi-output',model='media'):
+  urls=extract_urls(outcome); directory=Path(output_dir); directory.mkdir(parents=True,exist_ok=True); stamp=datetime.now().strftime('%Y%m%d-%H%M%S'); paths=[]
+  for index,url in enumerate(urls):
+   with httpx.stream('GET',url,timeout=120) as stream:
+    stream.raise_for_status(); suffix=Path(urlparse(url).path).suffix or mimetypes.guess_extension(stream.headers.get('content-type','').split(';',1)[0]) or '.bin'; path=directory/f"{stamp}-{re.sub(r'[^A-Za-z0-9_.-]','_',model)}-{index+1}{suffix}"
+    with path.open('wb') as handle:
+     for chunk in stream.iter_bytes():handle.write(chunk)
+   paths.append(path)
+  return paths
