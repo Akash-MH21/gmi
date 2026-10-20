@@ -98,7 +98,10 @@ def build_payload(schema,prompt,extras=None):
 def default_model(records,kind):
  candidates=[r for r in records if r.get('model_type')==kind and usable(r,kind)]
  def eligible(r):
+  inputs=(r.get('modalities') or {}).get('input') or []
+  if any((x.get('type') if isinstance(x,dict) else x) in {'image','audio','video'} and (x.get('required',True) if isinstance(x,dict) else True) for x in inputs): return False
   params=r.get('parameters') or []; prompts={p.get('name') for p in params if p.get('name') in PROMPT_NAMES}
+  if any(p.get('required') and p.get('type') in {'image','audio','video'} for p in params): return False
   return bool(prompts) and all(not p.get('required') or p.get('name') in prompts or p.get('default_value') is not None for p in params)
  candidates=[r for r in candidates if eligible(r)]
  return min(candidates,key=lambda r:Decimal(str((r.get('price_info') or {}).get('price','1e99')))) if candidates else None
