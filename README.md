@@ -341,9 +341,9 @@ Dry runs show the complete request and mask secrets:
 
 ```text
 $ gmi api sandbox Sandbox create-sandbox --dry-run --token gmi_supersecretTOKEN123 --set template_id=demo
-{"method": "POST", "url": "https://console.gmicloud.ai/api/v2/sandboxes", "headers": {"Authorization": "gmi_...N123"}, "body": {"template_id": "demo"}}
+{"method": "POST", "url": "https://console.gmicloud.ai/api/v2/sandboxes", "headers": {"Authorization": "Bearer gmi_...N123"}, "body": {"template_id": "demo"}}
 $ gmi api cluster baremetals delete-baremetal demo-id --dry-run --token session_secret_123
-{"method": "DELETE", "url": "https://console.gmicloud.ai/api/v1/baremetals/demo-id", "headers": {"Authorization": "gmi_..._123"}, "body": null}
+{"method": "DELETE", "url": "https://console.gmicloud.ai/api/v1/baremetals/demo-id", "headers": {"Authorization": "Bearer gmi_..._123"}, "body": null}
 ```
 
 | Auth scheme | What it needs |

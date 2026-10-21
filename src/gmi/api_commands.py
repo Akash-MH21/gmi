@@ -18,6 +18,11 @@ def _ops(service=None):
 def _auth_label(o):
     return o["security_scheme"]
 
+def _masked_header(value):
+    if value.startswith("Bearer "):
+        return "Bearer " + mask_key(value[7:])
+    return mask_key(value)
+
 class LazyApiGroup(click.Group):
     def _load(self):
         if not getattr(self, "_loaded", False):
@@ -59,7 +64,9 @@ def api_check(service, as_json):
         if any(p.get("required") for p in o["query_parameters"]): reasons.append("needs a required query parameter")
         if reasons: skipped.append({"operation":o["name"],"service":o["service"],"reasons":reasons}); continue
         try:
-            with httpx.Client(headers={"Authorization":"Bearer "+key,"User-Agent":"gmi-cli/0.1.0"},timeout=30) as c: r=c.get(o["server"].rstrip("/")+o["path"])
+            auth_headers={"User-Agent":"gmi-cli/0.1.0"}
+            if o["security_scheme"] in ("bearerAuth", "bearerAPIKey"): auth_headers["Authorization"]="Bearer "+key
+            with httpx.Client(headers=auth_headers,timeout=30) as c: r=c.get(o["server"].rstrip("/")+o["path"])
             verdict="ok" if r.status_code < 400 else "needs another key type" if r.status_code in (401,403) else "not found" if r.status_code==404 else "server error" if r.status_code>=500 else "ok"
             results.append({"service":o["service"],"group":o["group"],"operation":o["name"],"status":r.status_code,"verdict":verdict})
         except httpx.RequestError: results.append({"service":o["service"],"group":o["group"],"operation":o["name"],"status":None,"verdict":"network error"})
@@ -115,7 +122,7 @@ def _request(o, path_values, query, headers, data, sets, token, access_token, ho
         if not access_token: raise click.ClickException("This operation requires --access-token or GMI_SANDBOX_TOKEN")
         req_headers["X-Access-Token"] = access_token
     body = _body(data, sets, o.get("request_body")) if o.get("request_body") else None
-    shown = {k:(mask_key(v) if k.lower() in ("authorization","x-access-token") else v) for k,v in req_headers.items()}
+    shown = {k:(_masked_header(v) if k.lower() in ("authorization","x-access-token") else v) for k,v in req_headers.items()}
     if dry_run:
         click.echo(json.dumps({"method":o["method"],"url":full,"headers":shown,"body":body}, indent=2, ensure_ascii=False)); return
     if o["method"] != "GET":
