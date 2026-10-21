@@ -21,6 +21,7 @@
   <a href="#the-interactive-session">The session</a> |
   <a href="#scripting-and-automation">Scripting</a> |
   <a href="#models">Models</a> |
+  <a href="#media">Media</a> |
   <a href="#configuration-and-privacy">Config</a> |
   <a href="#roadmap">Roadmap</a> |
   <a href="#how-its-built">How it's built</a>
@@ -44,7 +45,7 @@ GMI Cloud has an OpenAI-compatible API, a Model Hub and a web console. `gmi` add
 - **Careful with your key.** Hidden prompt, verified before it is saved, stored with mode 600, never printed.
 
 > [!NOTE]
-> **Status: Day 1 of a six-day public build (20 to 25 Oct 2026).** What is in this README works today and was run against the live API. What is not built yet is listed in the [roadmap](#roadmap) and is not described anywhere else in this file.
+> **Status: Day 2 of a six-day public build (20 to 25 Oct 2026).** What is in this README works today and was run against the live API. What is not built yet is listed in the [roadmap](#roadmap) and is not described anywhere else in this file.
 
 ## Install
 
@@ -181,7 +182,7 @@ gmi models --json | jq -r '.data[] | select((.pricing.prompt|tonumber) < 0.00000
 - `gmi auth status` shows the masked key and checks that the API is reachable.
 - `gmi auth logout` removes the saved key. `--yes` skips the confirmation. A key in `GMI_API_KEY` stays active.
 
-**`gmi config get|set default_model [VALUE]`**: read or save the default chat model.
+**`gmi config get|set KEY [VALUE]`**: read or save a default. Keys: `default_model` (chat), `default_image_model`, `default_video_model` and `default_audio_model`.
 
 **Global options** (before any command): `--version`, `--api-key TEXT`, `--json`, `--help`.
 
@@ -210,17 +211,70 @@ Today `gmi` talks to text and media models. See [Media](#media) for image, video
 
 ## Media
 
-The media catalogue is fetched from GMI at runtime. Hidden entries and models without workers are filtered and usable records are cached for 24 hours.
+Generate images, video and audio with any model GMI serves, from the session or from scripts. The catalogue is read live from GMI, so new models show up without an update.
+
+<p align="center">
+  <img src="docs/media-demo.gif" alt="A recorded gmi session: the slash command menu, then /image with the price shown first and the saved file, then /video with live polling until the file is saved" width="860">
+</p>
+<p align="center"><sub>A real session. The waiting is shortened; the prices, model names and polling times are the real ones.</sub></p>
+
+In the session:
+
+| Command | What it does |
+|---|---|
+| `/image <prompt>` | Generate an image. Add `key=value` pairs for model parameters. |
+| `/video <prompt>` | Generate a video, for example `/video a paper boat on a pond duration=5`. |
+| `/audio <prompt>` | Generate speech or music. |
+| `/media` | Pick the default model for image, video or audio from a searchable list. |
+
+From a shell:
 
 ```sh
-gmi media models --type image
-gmi image "a small red lighthouse on a cliff at dawn"
-gmi audio "gmi works"
+gmi media models --type image          # what you can use right now, with prices
+gmi image "a small red lighthouse on a cliff at dawn, flat illustration"
 gmi video "a paper boat drifting on a calm pond, soft morning light" --param duration=5
-gmi media get REQUEST_ID --out ./gmi-output
+gmi audio "gmi works"
+gmi media list --limit 5               # your recent requests
+gmi media get REQUEST_ID --out ./gmi-output   # fetch a result you stopped waiting for
 ```
 
-Prices are shown in dollars with the model's billing unit. Estimates use the prompt length or duration when available. Estimates of at least $0.25 ask `Continue? [y/N]`; scripts can pass `--yes`. Files are saved under `gmi-output` by default. Some models allow only a few requests per day. Local file inputs are not supported yet.
+What a run looks like (real output):
+
+```
+gmi> /image a small red lighthouse on a cliff at dawn, flat illustration
+Price: $0.0350 per image
+Model: seedream-5.0-lite
+Saved gmi-output/20261021-005332-seedream-5.0-lite-1.jpg (178194 bytes)
+gmi> /video a paper boat drifting on a calm pond, soft morning light duration=5
+Price: $0.1100 for 5 seconds ($0.022 / second)
+seedance-1-0-pro-fast-251015 dispatched (0s)
+seedance-1-0-pro-fast-251015 processing (2s)
+seedance-1-0-pro-fast-251015 success (27s)
+```
+
+<p align="center">
+  <img src="docs/media-lighthouse.jpg" alt="The image gmi made from that prompt: a red lighthouse on a dark cliff at a pink and gold dawn" width="420"><br>
+  <sub>The image from that run: 2048 x 2048, made by <code>seedream-5.0-lite</code> for $0.035.</sub>
+</p>
+
+**How models are chosen**
+
+- **Only usable models are listed.** A model must be active, visible and have workers. A model with no workers would wait in GMI's queue forever, so gmi hides it.
+- **Defaults.** For each type the default is the cheapest listed model that needs only text input. Pin your own with `/media` or `gmi config set default_image_model <id>` (also `default_video_model` and `default_audio_model`). `--model` overrides it for one call.
+- **Parameters.** `--param key=value` (or `key=value` after the prompt in the session) sets any parameter in the model's own schema. Values are checked. An enum with a wrong value lists the valid options.
+
+**Prices and files**
+
+- The price is shown before every call, in dollars with the billing unit. It becomes an estimate when the duration or text length is known.
+- A call estimated at $0.25 or more asks `Continue? [y/N]`. Scripts pass `--yes`.
+- Results are saved to `./gmi-output/` (or `--out DIR`) as `timestamp-model-n.ext`. Downloads need no key.
+- Press `Ctrl+C` while waiting and gmi prints the request id. Nothing is cancelled on GMI's side. `gmi media get` brings the file back later.
+
+**Limits**
+
+- Inputs that are images, audio or video must be `http(s)` URLs. Local file paths are not supported yet.
+- Some models allow only a few requests per day. gmi tells you when the limit resets and does not retry.
+- A provider can be briefly unavailable. gmi retries twice, then says so and leaves the choice of another model to you.
 
 ## Configuration and privacy
 
@@ -303,6 +357,7 @@ src/gmi/
   cli.py           command line entry point and the scripting commands
   api.py           HTTP client: streaming, retries, error mapping
   config.py        key, model and config file handling
+  media.py         media catalogue, requests, pricing and downloads
   app/
     session.py     the interactive loop, banner and key bindings
     commands.py    the slash command registry (new commands plug in here)
