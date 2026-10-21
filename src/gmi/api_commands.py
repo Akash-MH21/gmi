@@ -3,7 +3,7 @@ import json, os, sys, re
 from pathlib import Path
 from urllib.parse import quote, urlencode
 import click, httpx
-from .config import GMIError, mask_key, resolve_key
+from .config import GMIError, mask_key, resolve_key, read_key
 
 _MANIFEST = None
 def manifest():
@@ -22,6 +22,31 @@ def _masked_header(value):
     if value.startswith("Bearer "):
         return "Bearer " + mask_key(value[7:])
     return mask_key(value)
+
+def _credential(service, explicit=None, allow_missing=False):
+    """Return (value, source, scope hint) using service-specific precedence."""
+    if explicit:
+        return explicit, "--token", "explicit"
+    token = os.environ.get("GMI_TOKEN")
+    if token:
+        return token, "GMI_TOKEN", "explicit"
+    if service in ("sandbox", "cluster"):
+        for name in ("GMI_COMPUTE_API_KEY", "GMI_SANDBOX_API_KEY"):
+            value = os.environ.get(name)
+            if value:
+                return value, name, "compute"
+    value = os.environ.get("GMI_API_KEY")
+    if value:
+        return value, "GMI_API_KEY", "normal"
+    value = read_key()
+    if value:
+        return value, "setting NAME", "normal"
+    if allow_missing:
+        return None, None, None
+    raise GMIError("Missing API key; run gmi auth login or set GMI_API_KEY.")
+
+def _auth_for(o, token=None, allow_missing=False):
+    return _credential(o["service"], token, allow_missing=allow_missing)
 
 class LazyApiGroup(click.Group):
     def _load(self):
@@ -53,38 +78,66 @@ def api_list(service, method, search, as_json):
 
 @api_group.command("check")
 @click.option("--service", type=click.Choice(["iam","idc","sandbox","cluster"]))
+@click.option("--token", envvar="GMI_TOKEN")
+@click.option("--idc-name", envvar="GMI_SANDBOX_IDC_NAME")
+@click.option("--markdown", type=click.Path(dir_okay=False, writable=True))
 @click.option("--json", "as_json", is_flag=True)
-def api_check(service, as_json):
+def api_check(service, token, idc_name, markdown, as_json):
     """Probe safe GET operations and classify access."""
-    key = resolve_key(None); rows = _ops(service); results=[]; skipped=[]
+    rows = _ops(service); results=[]; skipped=[]; credentials={}
     for o in rows:
         reasons=[]
         if o["method"] != "GET": reasons.append("not a GET")
         if o["path_parameters"]: reasons.append("needs a path parameter")
-        if any(p.get("required") for p in o["query_parameters"]): reasons.append("needs a required query parameter")
+        missing_query = [p for p in o["query_parameters"] if p.get("required") and not (p["name"] == "idc_name" and idc_name)]
+        if missing_query: reasons.append("needs a required query parameter")
         if reasons: skipped.append({"operation":o["name"],"service":o["service"],"reasons":reasons}); continue
         try:
             auth_headers={"User-Agent":"gmi-cli/0.1.0"}
-            if o["security_scheme"] in ("bearerAuth", "bearerAPIKey"): auth_headers["Authorization"]="Bearer "+key
-            with httpx.Client(headers=auth_headers,timeout=30) as c: r=c.get(o["server"].rstrip("/")+o["path"])
-            verdict="ok" if r.status_code < 400 else "needs another key type" if r.status_code in (401,403) else "not found" if r.status_code==404 else "server error"
+            key, source, _ = _auth_for(o, token, allow_missing=True)
+            if key and o["security_scheme"] in ("bearerAuth", "bearerAPIKey"):
+                auth_headers["Authorization"]="Bearer "+key
+                credentials.setdefault(key, {"source": source, "services": set()})["services"].add(o["service"])
+            query = {"idc_name": idc_name} if idc_name and any(p["name"] == "idc_name" for p in o["query_parameters"]) else {}
+            with httpx.Client(headers=auth_headers,timeout=30) as c: r=c.get(o["server"].rstrip("/")+o["path"], params=query)
+            verdict="ok" if r.status_code < 400 else "needs another key type" if r.status_code in (401,403) else "bad request" if r.status_code==400 else "not found" if r.status_code==404 else "server error"
             results.append({"service":o["service"],"group":o["group"],"operation":o["name"],"status":r.status_code,"verdict":verdict})
         except httpx.RequestError: results.append({"service":o["service"],"group":o["group"],"operation":o["name"],"status":None,"verdict":"network error"})
-    scope={}
-    try:
-        with httpx.Client(headers={"Authorization":"Bearer "+key,"User-Agent":"gmi-cli/0.1.0"},timeout=30) as c:
-            r=c.get("https://console.gmicloud.ai/api/v1/me/api-keys/current"); value=r.json(); value=value.get("key", value); scope={"scope":value.get("scope"),"product":value.get("product")}
-    except Exception: scope={"scope":None,"product":None}
+    keys=[]
+    for value, info in credentials.items():
+        scope = {"scope": None, "product": None}
+        try:
+            with httpx.Client(headers={"Authorization":"Bearer "+value,"User-Agent":"gmi-cli/0.1.0"},timeout=30) as c:
+                payload=c.get("https://console.gmicloud.ai/api/v1/me/api-keys/current").json()
+                payload=payload.get("key", payload); scope={"scope":payload.get("scope"),"product":payload.get("product")}
+        except Exception: pass
+        keys.append({"services": sorted(info["services"]), "source": info["source"], **scope})
     by_service={}; by_verdict={}
     for item in results:
-        by_service.setdefault(item["service"], {"run":0,"ok":0,"needs another key type":0,"not found":0,"server error":0,"network error":0})
+        by_service.setdefault(item["service"], {"run":0,"ok":0,"needs another key type":0,"bad request":0,"not found":0,"server error":0,"network error":0})
         by_service[item["service"]]["run"] += 1; by_service[item["service"]][item["verdict"]] += 1
         by_verdict[item["verdict"]] = by_verdict.get(item["verdict"], 0) + 1
-    report={"key":scope,"results":results,"skipped":skipped,"summary":{"generated":len(rows),"run":len(results),"not_run":len(skipped),"by_service":by_service,"by_verdict":by_verdict}}
+    report={"keys":keys,"results":results,"skipped":skipped,"summary":{"generated":len(rows),"run":len(results),"not_run":len(skipped),"by_service":by_service,"by_verdict":by_verdict}}
+    if markdown:
+        Path(markdown).write_text(render_markdown(report), encoding="utf-8")
     if as_json: click.echo(json.dumps(report, separators=(",",":"))); return
-    click.echo(f"Key scope: {scope.get('scope')} product: {scope.get('product')}")
+    click.echo(f"Keys: {len(keys)}")
     for x in results: click.echo(f"{x['service']} {x['operation']} {x['status']} {x['verdict']}")
     click.echo(f"Generated {len(rows)} of {len(manifest()['operations'])}; run live {len(results)}; not run {len(skipped)}")
+
+def render_markdown(report):
+    from datetime import date
+    lines=[f"# API coverage ({date.today().isoformat()})", "", "Generated by `gmi api check --markdown FILE`.", "", "## Keys", "", "| Source | Services | Scope | Product |", "|---|---|---|---|"]
+    for key in report.get("keys", []): lines.append(f"| {key.get('source')} | {', '.join(key.get('services', []))} | {key.get('scope') or ''} | {key.get('product') or ''} |")
+    lines += ["", "## Results", "", "| Service | Operation | Status | Verdict |", "|---|---|---:|---|"]
+    for row in report.get("results", []): lines.append(f"| {row['service']} | `{row['operation']}` | {row['status'] if row['status'] is not None else ''} | {row['verdict']} |")
+    lines += ["", "## Summary by service", "", "| Service | Run | OK | Needs another key type | Bad request |", "|---|---:|---:|---:|---:|"]
+    for service, summary in report.get("summary", {}).get("by_service", {}).items(): lines.append(f"| {service} | {summary.get('run',0)} | {summary.get('ok',0)} | {summary.get('needs another key type',0)} | {summary.get('bad request',0)} |")
+    lines += ["", "## Verdict totals", ""]
+    for verdict, count in report.get("summary", {}).get("by_verdict", {}).items(): lines.append(f"- {verdict}: {count}")
+    lines += ["", "## Not run", "", "| Service | Operation | Reasons |", "|---|---|---|"]
+    for row in report.get("skipped", []): lines.append(f"| {row['service']} | `{row['operation']}` | {'; '.join(row['reasons'])} |")
+    return "\n".join(lines)+"\n"
 
 def _coerce(value, spec):
     typ = spec.get("type", "string")
@@ -119,7 +172,8 @@ def _request(o, path_values, query, headers, data, sets, token, access_token, ho
     full = url + (("?" + urlencode(query, doseq=True)) if query else "")
     scheme = o["security_scheme"]; req_headers = {k:v for k,v in headers.items() if v is not None}
     if scheme in ("bearerAuth", "bearerAPIKey"):
-        if token or not dry_run: req_headers["Authorization"] = "Bearer " + (token or resolve_key(None))
+        key, _, _ = _auth_for(o, token, allow_missing=dry_run)
+        if key: req_headers["Authorization"] = "Bearer " + key
     elif scheme == "bearerEmailVerificationToken":
         if not token: raise click.ClickException("This operation requires --token")
         req_headers["Authorization"] = "Bearer " + token
@@ -142,7 +196,7 @@ def _request(o, path_values, query, headers, data, sets, token, access_token, ho
     if response.status_code >= 400:
         try: payload=response.json(); msg=payload.get("message") or payload.get("error") or payload
         except Exception: msg=response.text[:200]
-        extra = " This key type may not be allowed for this operation: see gmi api check." if response.status_code == 401 else ""
+        extra = " Set GMI_COMPUTE_API_KEY or GMI_SANDBOX_API_KEY to a console API key with compute scope; see gmi api check." if response.status_code == 401 and o["service"] in ("sandbox", "cluster") else ""
         raise click.ClickException(f"HTTP {response.status_code}: {msg}{extra}")
     if o.get("returns_binary"):
         if not output: raise click.ClickException("This operation returns binary data; use --out FILE")
@@ -155,7 +209,11 @@ def _operation_command(o):
     params=[]
     for p in reversed(o["path_parameters"]): params.append(click.argument(p["name"]))
     def dest(name): return re.sub(r"\W", "_", name).strip("_")
-    for p in reversed(o["query_parameters"]): params.append(click.option("--" + re.sub(r"[^A-Za-z0-9_-]", "-", p["name"]), dest(p["name"]), default=p.get("default"), required=p.get("required",False)))
+    for p in reversed(o["query_parameters"]):
+        kwargs = {"default": p.get("default"), "required": p.get("required", False)}
+        if p["name"] == "idc_name":
+            kwargs.update(envvar="GMI_SANDBOX_IDC_NAME", required=False)
+        params.append(click.option("--" + re.sub(r"[^A-Za-z0-9_-]", "-", p["name"]), dest(p["name"]), **kwargs))
     for p in reversed(o["header_parameters"]): params.append(click.option("--" + re.sub(r"[^A-Za-z0-9_-]", "-", p["name"]), dest(p["name"])))
     params += [click.option("--data"), click.option("--set", "sets", multiple=True), click.option("--token", envvar="GMI_TOKEN"), click.option("--access-token", envvar="GMI_SANDBOX_TOKEN"), click.option("--host"), click.option("--out", "output"), click.option("--yes", is_flag=True), click.option("--dry-run", is_flag=True), click.option("--json", "as_json", is_flag=True)]
     def callback(*args, **kwargs):
