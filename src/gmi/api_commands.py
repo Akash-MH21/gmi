@@ -67,7 +67,7 @@ def api_check(service, as_json):
             auth_headers={"User-Agent":"gmi-cli/0.1.0"}
             if o["security_scheme"] in ("bearerAuth", "bearerAPIKey"): auth_headers["Authorization"]="Bearer "+key
             with httpx.Client(headers=auth_headers,timeout=30) as c: r=c.get(o["server"].rstrip("/")+o["path"])
-            verdict="ok" if r.status_code < 400 else "needs another key type" if r.status_code in (401,403) else "not found" if r.status_code==404 else "server error" if r.status_code>=500 else "ok"
+            verdict="ok" if r.status_code < 400 else "needs another key type" if r.status_code in (401,403) else "not found" if r.status_code==404 else "server error"
             results.append({"service":o["service"],"group":o["group"],"operation":o["name"],"status":r.status_code,"verdict":verdict})
         except httpx.RequestError: results.append({"service":o["service"],"group":o["group"],"operation":o["name"],"status":None,"verdict":"network error"})
     scope={}
@@ -75,7 +75,12 @@ def api_check(service, as_json):
         with httpx.Client(headers={"Authorization":"Bearer "+key,"User-Agent":"gmi-cli/0.1.0"},timeout=30) as c:
             r=c.get("https://console.gmicloud.ai/api/v1/me/api-keys/current"); value=r.json(); value=value.get("key", value); scope={"scope":value.get("scope"),"product":value.get("product")}
     except Exception: scope={"scope":None,"product":None}
-    report={"key":scope,"results":results,"skipped":skipped,"summary":{"generated":len(rows),"run":len(results),"not_run":len(skipped)}}
+    by_service={}; by_verdict={}
+    for item in results:
+        by_service.setdefault(item["service"], {"run":0,"ok":0,"needs another key type":0,"not found":0,"server error":0,"network error":0})
+        by_service[item["service"]]["run"] += 1; by_service[item["service"]][item["verdict"]] += 1
+        by_verdict[item["verdict"]] = by_verdict.get(item["verdict"], 0) + 1
+    report={"key":scope,"results":results,"skipped":skipped,"summary":{"generated":len(rows),"run":len(results),"not_run":len(skipped),"by_service":by_service,"by_verdict":by_verdict}}
     if as_json: click.echo(json.dumps(report, separators=(",",":"))); return
     click.echo(f"Key scope: {scope.get('scope')} product: {scope.get('product')}")
     for x in results: click.echo(f"{x['service']} {x['operation']} {x['status']} {x['verdict']}")
@@ -119,6 +124,7 @@ def _request(o, path_values, query, headers, data, sets, token, access_token, ho
         if not token: raise click.ClickException("This operation requires --token")
         req_headers["Authorization"] = "Bearer " + token
     elif scheme == "sandboxAccessToken":
+        if not host: raise click.ClickException("This operation requires --host https://{sandbox_key}.{domain}")
         if not access_token: raise click.ClickException("This operation requires --access-token or GMI_SANDBOX_TOKEN")
         req_headers["X-Access-Token"] = access_token
     body = _body(data, sets, o.get("request_body")) if o.get("request_body") else None
