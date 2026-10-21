@@ -1,0 +1,3022 @@
+# Sandbox subset of the business-service API spec (docs/openapi.yaml), maintained by hand in this repo.
+# When the source spec changes, re-derive this file from the sandbox-tagged operations and keep it in sync,
+# but strip internal implementation references that are fine in the internal contract but do not belong in
+# customer-facing docs.
+openapi: 3.0.3
+info:
+  title: GMI Sandbox API
+  description: 'REST API for GMI Sandbox: create isolated execution environments from templates, manage
+    their lifecycle on the control plane, and run commands or transfer files through each sandbox''s own
+    data plane.'
+  contact:
+    name: GMI Cloud Support
+    email: support@gmicloud.ai
+  version: '2.0'
+servers:
+- url: https://console.gmicloud.ai/api/v2
+  description: Control plane
+tags:
+- name: Sandbox
+  description: 'Sandbox instance lifecycle management (Sandbox v2, /api/v2/sandboxes)
+
+    '
+- name: SandboxTemplate
+  description: Sandbox template management (Sandbox v2, `/api/v2/templates`)
+- name: Sandbox-Exec
+  description: 'Sandbox execution data plane (accessed via the sandbox host and sandbox access token).
+    These endpoints are not under the control plane''s `/api/v2` path; clients connect directly to `https://{sandbox_key}.{domain}`
+    and authenticate with `X-Access-Token`.
+
+    '
+- name: Sandbox-Files
+  description: 'Sandbox file data plane (`/files`). **These endpoints are not under `/api/v2`** and do
+    not use `Authorization: Bearer`: they are served by the sandbox''s own data-plane entry point — clients
+    connect directly to `https://{sandbox_key}.{domain}` and authenticate with `X-Access-Token`. `{sandbox_key}`
+    is the `sandbox_key` returned by the create/connect endpoints, used for data-plane host addressing.
+    `{domain}` and `X-Access-Token` are the `domain` and `sandbox_access_token` from the same responses
+    — no extra endpoint is needed to obtain them.
+
+
+    This split is not historical baggage but the nature of a data plane: file transfer is long-lived,
+    high-volume, and addressed per sandbox, differing from the control plane''s short requests in both
+    capacity model and failure domain, so they do not share an entry point.
+
+
+    **One unified abstraction.** The same contract is served by two backend kinds (an in-sandbox file
+    service / a data-center data-plane proxy); clients need not — and cannot — tell them apart. The cost
+    is that the contract is their intersection: `Content-Length` on download and resumable download (`Range`/`206`)
+    are **optional capabilities** that vary by data center, and clients must work correctly when they
+    are absent. See the per-operation notes below.
+
+    '
+security:
+- bearerAuth: []
+paths:
+  /sandboxes:
+    post:
+      tags:
+      - Sandbox
+      summary: Create a sandbox
+      description: 'Creates a sandbox from a `template_id`.
+
+
+        Compute resources (CPU / memory / disk / architecture) are inherited from the snapshot of the
+        selected Template Build. They are fixed when the Template is built and cannot be overridden at
+        creation time.
+
+
+        Idempotency: pass an explicit `Idempotency-Key` request header as the idempotency key (unrelated
+        to the tracing header `X-Request-ID`, which is always generated server-side; a client-supplied
+        value is ignored). Resubmitting the same key with identical parameters returns the sandbox created
+        by the first request (with its current access data) plus an `Idempotency-Replayed: true` response
+        header. The same key with different parameters returns 400 `Sandbox.IdempotentParameterMismatch`.
+        If the creation under that key has deterministically failed, or the sandbox it created has been
+        deleted, the request returns 409 `Sandbox.IdempotentKeyConsumed` (retryable failures are automatically
+        re-attempted when the same key is retried). The deduplication window is 24 hours; after it expires
+        the same key is treated as a new request. Without the header, no deduplication is performed.
+
+
+        Backends that create asynchronously return as soon as the request is accepted: the instance starts
+        in `provisioning` and transitions to `running` once ready. The detail endpoint is queryable during
+        this period (see GET /sandboxes/{id}).
+
+
+        **The `sandbox_access_token` stays valid for the entire lifetime of the sandbox.**
+
+        '
+      operationId: createSandbox
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyOptionalParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateSandboxControlRequest'
+      responses:
+        '201':
+          description: Sandbox created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/CreateSandboxControlResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/UnprocessableEntity'
+        '429':
+          $ref: '#/components/responses/QuotaExceeded'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    get:
+      tags:
+      - Sandbox
+      summary: List active sandboxes
+      description: 'Returns sandboxes that are still actionable or still worth watching: `provisioning`,
+        `running`, `updating`, `checkpointing`, plus the terminal failure state `failed`. Instances in
+        transitional states do not disappear from the list while an operation is in flight. Results are
+        ordered by `started_at` descending; pagination is applied after filtering.
+
+
+        The `state` filter takes external states; the server maps them back to internal ones. `running`
+        also matches instances in short-lived lease states (`updating` / `checkpointing`), because those
+        mean "running but briefly busy" rather than a separately actionable state.
+
+        '
+      operationId: listSandboxes
+      parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/PageSizeParam'
+      - $ref: '#/components/parameters/IdcNameQueryParam'
+      - name: state
+        in: query
+        description: Filter by external state. Repeatable; multiple values are OR-ed.
+        required: false
+        schema:
+          type: array
+          items:
+            type: string
+            enum:
+            - provisioning
+            - running
+            - failed
+      - name: metadata[key]
+        in: query
+        description: 'Filter by customer metadata key/value, e.g. `metadata[job_id]=job-9182`. Repeatable;
+          multiple filters are AND-ed.
+
+          '
+        required: false
+        schema:
+          type: string
+      responses:
+        '200':
+          description: Query succeeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ListSandboxesControlResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /executions:
+    servers:
+    - url: https://{sandbox_key}.{domain}
+      description: 'Sandbox data-plane entry point. Both variables come from the create/connect response:
+        `sandbox_key` is `data.sandbox_key`, `domain` is `data.domain`.
+
+        '
+      variables:
+        sandbox_key:
+          default: sandbox-key
+          description: Sandbox key (the `sandbox_key` returned by the create/connect endpoints)
+        domain:
+          default: sandbox.example.com
+          description: 'The `domain` returned verbatim by the create/connect endpoints. Its default naming
+            shape is `{idc-name}.{root-hostname}`, but clients must not assemble or derive it themselves.
+
+            '
+    post:
+      tags:
+      - Sandbox-Exec
+      summary: Execute a command in a sandbox
+      description: 'Starts an asynchronous shell execution in the sandbox. The request body keeps the
+
+        `action=exec` and `parameters` shape used by the runtime contract. The effective URL is
+
+        the sandbox data-plane host; the sandbox ID is obtained from the leftmost Host label and
+
+        is not repeated in the path. The endpoint does not include the control-plane `/api/v2` prefix.
+
+        When `wait=true`, the server waits for a terminal result for at most
+
+        `wait_timeout_seconds` seconds; a timeout returns `202` without canceling the execution.
+
+        '
+      operationId: createSandboxExecution
+      servers:
+      - url: https://{sandbox_key}.{domain}
+        description: Sandbox data-plane host
+        variables:
+          sandbox_key:
+            default: sandbox-key
+            description: Data-plane addressing key (`sandbox_key` from the control-plane response).
+          domain:
+            default: sandbox.example.com
+            description: Sandbox data-plane domain from the control-plane response.
+      security:
+      - sandboxAccessToken: []
+      parameters:
+      - $ref: '#/components/parameters/SandboxExecRequestIDParam'
+      - $ref: '#/components/parameters/SandboxExecWaitParam'
+      - $ref: '#/components/parameters/SandboxExecWaitTimeoutParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SandboxExecRequest'
+            example:
+              action: exec
+              parameters:
+                command: printf '%s\n' "$APP_ENV"
+                envs:
+                  APP_ENV: production
+                cwd: /workspace
+      responses:
+        '200':
+          description: Execution completed within the requested wait window.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SandboxExecResultResponse'
+        '202':
+          description: Execution accepted, or still running when the wait window expired.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SandboxExecAcceptedResponse'
+        '400':
+          $ref: '#/components/responses/SandboxExecBadRequest'
+        '401':
+          $ref: '#/components/responses/SandboxExecUnauthorized'
+        '429':
+          $ref: '#/components/responses/SandboxExecRateLimited'
+        '500':
+          $ref: '#/components/responses/SandboxExecInternalError'
+  /executions/{execution_id}:
+    servers:
+    - url: https://{sandbox_key}.{domain}
+      description: 'Sandbox data-plane entry point. Both variables come from the create/connect response:
+        `sandbox_key` is `data.sandbox_key`, `domain` is `data.domain`.
+
+        '
+      variables:
+        sandbox_key:
+          default: sandbox-key
+          description: Sandbox key (the `sandbox_key` returned by the create/connect endpoints)
+        domain:
+          default: sandbox.example.com
+          description: 'The `domain` returned verbatim by the create/connect endpoints. Its default naming
+            shape is `{idc-name}.{root-hostname}`, but clients must not assemble or derive it themselves.
+
+            '
+    get:
+      tags:
+      - Sandbox-Exec
+      summary: Get a sandbox execution
+      operationId: getSandboxExecution
+      servers:
+      - url: https://{sandbox_key}.{domain}
+        description: Sandbox data-plane host
+        variables:
+          sandbox_key:
+            default: sandbox-key
+            description: Data-plane addressing key (`sandbox_key` from the control-plane response).
+          domain:
+            default: sandbox.example.com
+            description: Sandbox data-plane domain from the control-plane response.
+      security:
+      - sandboxAccessToken: []
+      parameters:
+      - $ref: '#/components/parameters/SandboxExecExecutionIDParam'
+      - $ref: '#/components/parameters/SandboxExecRequestIDParam'
+      responses:
+        '200':
+          description: Current execution status and any available output.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SandboxExecResultResponse'
+        '400':
+          $ref: '#/components/responses/SandboxExecBadRequest'
+        '401':
+          $ref: '#/components/responses/SandboxExecUnauthorized'
+        '404':
+          $ref: '#/components/responses/SandboxExecNotFound'
+        '429':
+          $ref: '#/components/responses/SandboxExecRateLimited'
+        '500':
+          $ref: '#/components/responses/SandboxExecInternalError'
+  /executions/{execution_id}/cancel:
+    servers:
+    - url: https://{sandbox_key}.{domain}
+      description: 'Sandbox data-plane entry point. Both variables come from the create/connect response:
+        `sandbox_key` is `data.sandbox_key`, `domain` is `data.domain`.
+
+        '
+      variables:
+        sandbox_key:
+          default: sandbox-key
+          description: Sandbox key (the `sandbox_key` returned by the create/connect endpoints)
+        domain:
+          default: sandbox.example.com
+          description: 'The `domain` returned verbatim by the create/connect endpoints. Its default naming
+            shape is `{idc-name}.{root-hostname}`, but clients must not assemble or derive it themselves.
+
+            '
+    post:
+      tags:
+      - Sandbox-Exec
+      summary: Cancel a sandbox execution
+      description: 'Requests cancellation of a non-terminal execution. Cancellation is idempotent:
+
+        repeated calls return the terminal canceled result once cancellation completes.
+
+        '
+      operationId: cancelSandboxExecution
+      servers:
+      - url: https://{sandbox_key}.{domain}
+        description: Sandbox data-plane host
+        variables:
+          sandbox_key:
+            default: sandbox-key
+            description: Data-plane addressing key (`sandbox_key` from the control-plane response).
+          domain:
+            default: sandbox.example.com
+            description: Sandbox data-plane domain from the control-plane response.
+      security:
+      - sandboxAccessToken: []
+      parameters:
+      - $ref: '#/components/parameters/SandboxExecExecutionIDParam'
+      - $ref: '#/components/parameters/SandboxExecRequestIDParam'
+      responses:
+        '200':
+          description: Execution was already canceled and is now returned as terminal.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SandboxExecResultResponse'
+        '202':
+          description: Cancellation accepted and is being processed.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SandboxExecAcceptedResponse'
+        '400':
+          $ref: '#/components/responses/SandboxExecBadRequest'
+        '401':
+          $ref: '#/components/responses/SandboxExecUnauthorized'
+        '404':
+          $ref: '#/components/responses/SandboxExecNotFound'
+        '409':
+          $ref: '#/components/responses/SandboxExecConflict'
+        '429':
+          $ref: '#/components/responses/SandboxExecRateLimited'
+        '500':
+          $ref: '#/components/responses/SandboxExecInternalError'
+  /sandboxes/{id}:
+    get:
+      tags:
+      - Sandbox
+      summary: Get sandbox details
+      description: 'Returns sandbox details. Instances in the terminal failure state (`failed`) remain
+        readable, with the failure reason in `failure`; deleted or expired instances return 404.
+
+        '
+      operationId: getSandbox
+      parameters:
+      - $ref: '#/components/parameters/SandboxIdPathParam'
+      responses:
+        '200':
+          description: Query succeeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SandboxControlDetailResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      tags:
+      - Sandbox
+      summary: Update sandbox metadata
+      description: 'Replaces the customer-defined metadata as a whole — no per-key merging; passing an
+        empty object clears it. There are no mutable fields other than `metadata`. This operation does
+        not take the lifecycle lock, so it works in any visible state.
+
+        '
+      operationId: updateSandbox
+      parameters:
+      - $ref: '#/components/parameters/SandboxIdPathParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateSandboxControlRequest'
+      responses:
+        '200':
+          description: Update succeeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SandboxControlDetailResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags:
+      - Sandbox
+      summary: Delete (kill) a sandbox
+      description: 'Accepts the deletion. A 202 response means the deletion intent has been persisted
+        and the instance enters `deleting`; it only becomes `deleted` after the backing resources are
+        confirmed released. If the release fails, the instance stays in `deleting` and reconciliation
+        retries — **there is no force parameter**: skipping the release would leave orphaned billable
+        resources.
+
+
+        Once the deletion intent is persisted the call is safely replayable: repeating it against a sandbox
+        already being deleted returns 202 again, not 409.
+
+        '
+      operationId: deleteSandbox
+      parameters:
+      - $ref: '#/components/parameters/SandboxIdPathParam'
+      responses:
+        '202':
+          description: Deletion accepted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SandboxDeleteAcceptedResponse'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /sandboxes/{id}/connect:
+    post:
+      tags:
+      - Sandbox
+      summary: Connect to a sandbox
+      description: 'Connects to a running sandbox and returns its data-plane connection info (domain and
+        access token). When `timeout` is provided and greater than 0, the call also extends the sandbox''s
+        lifetime (extend-only, never shortens). Returns 409 if the instance is not running.
+
+
+        The response always returns the authoritative expiry time `end_at` as settled by this call — if
+        no extension took effect (the requested expiry is not later than the current one), it is simply
+        the unchanged current value.
+
+
+        **The `sandbox_access_token` stays valid for the entire lifetime of the sandbox. When the lifetime
+        is extended, the control plane re-signs and returns a new token; even without an extension, if
+        the token has drifted from the sandbox''s current `end_at`, this endpoint repairs it.**
+
+        '
+      operationId: connectSandbox
+      parameters:
+      - $ref: '#/components/parameters/SandboxIdPathParam'
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ConnectSandboxControlRequest'
+      responses:
+        '200':
+          description: Connected
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ConnectSandboxControlResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /sandboxes/{id}/timeout:
+    post:
+      tags:
+      - Sandbox
+      summary: Set sandbox timeout
+      description: 'Resets the time-to-live relative to the current time. When `timeout` is omitted or
+        is 0 or less, 300 seconds is used. Only allowed while `running`; any other state returns 409.
+
+
+        The response returns the expiry time before and after this change: since a `timeout` of 0 or less
+        is replaced by the default duration, callers cannot derive the effective value from their own
+        request parameters — treat `new_end_at` in the response as authoritative.
+
+
+        **The `sandbox_access_token` stays valid for the entire lifetime of the sandbox. After extending
+        the lifetime, call the connect endpoint again to obtain a new token.**
+
+        '
+      operationId: setSandboxTimeout
+      parameters:
+      - $ref: '#/components/parameters/SandboxIdPathParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetSandboxControlTimeoutRequest'
+      responses:
+        '200':
+          description: Timeout set; returns the expiry time before and after the change.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SetSandboxControlTimeoutResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/SandboxMutationFailed'
+        '500':
+          $ref: '#/components/responses/SandboxMutationFailed'
+  /files:
+    servers:
+    - url: https://{sandbox_key}.{domain}
+      description: 'Sandbox data-plane entry point. Both variables come from the create/connect response:
+        `sandbox_key` is `data.sandbox_key`, `domain` is `data.domain`.
+
+        '
+      variables:
+        sandbox_key:
+          default: sandbox-key
+          description: Sandbox key (the `sandbox_key` returned by the create/connect endpoints)
+        domain:
+          default: sandbox.example.com
+          description: 'The `domain` returned verbatim by the create/connect endpoints. Its default naming
+            shape is `{idc-name}.{root-hostname}`, but clients must not assemble or derive it themselves.
+
+            '
+    get:
+      tags:
+      - Sandbox-Files
+      summary: Download a sandbox file
+      description: 'Reads a single file inside the sandbox by absolute path; the response body is the
+        raw byte stream.
+
+
+        ## Three ways this differs from the rest of the platform
+
+
+        1. **Not served under `/api/v2`** — see this operation''s `servers`.
+
+        2. **The auth header is `X-Access-Token`** (the `sandbox_access_token` value), not `Authorization:
+        Bearer`. Control-plane tokens are invalid here, and vice versa.
+
+        3. **Successful responses are not wrapped in the `{request_id, data}` envelope** (the body is
+        a byte stream), and neither are errors — see the error notes below.
+
+
+        ## Optional capabilities: `Content-Length` and resumable downloads
+
+
+        Both **vary by data center; clients must not assume they exist**:
+
+
+        | Capability | When supported | When not supported |
+
+        | --- | --- | --- |
+
+        | `Accept-Ranges` | `bytes` | `none` |
+
+        | `Content-Length` | Declares the byte count; enables progress display | Absent; `Transfer-Encoding:
+        chunked` |
+
+        | `Range` requests | Returns `206` + `Content-Range` per RFC 7233 | **Returns `200` with the full
+        file** |
+
+
+        **`Accept-Ranges` is the only runtime capability probe**: issue one request without `Range`, or
+        read the header on the first response, before deciding whether to resume.
+
+
+        Data centers without resume support **never fake a `206`**: a request with `Range` gets `200`
+        and the entire file. This is deliberate — a client that mistakes the response for a range would
+        write bytes at the wrong offset and produce a silently corrupted file, which is far worse than
+        an ignored `Range`. The correct resumable-download logic is therefore "resume only when `Accept-Ranges:
+        bytes`, otherwise re-download the whole file" — **never** key off any signal other than `206`.
+
+
+        The server returns no checksum headers (neither backend provides them); clients that need integrity
+        verification should compute and compare checksums themselves.
+
+        '
+      operationId: downloadSandboxFile
+      security:
+      - sandboxAccessToken: []
+      parameters:
+      - $ref: '#/components/parameters/SandboxFilePathQueryParam'
+      - $ref: '#/components/parameters/SandboxFileUsernameQueryParam'
+      - name: Range
+        in: header
+        required: false
+        description: 'Only honored in data centers with `Accept-Ranges: bytes`; format `bytes=<start>-<end>`.
+          Other data centers ignore the header and return `200` + the full file (not `206`).
+
+          '
+        schema:
+          type: string
+        example: bytes=1048576-
+      responses:
+        '200':
+          description: 'The full file. Requests with `Range` also take this branch when the data center
+            does not support resuming.
+
+            '
+          headers:
+            Content-Disposition:
+              description: '`attachment; filename="<basename>"`'
+              schema:
+                type: string
+            Accept-Ranges:
+              description: '`bytes` (resume supported) or `none` (not supported).'
+              schema:
+                type: string
+                enum:
+                - bytes
+                - none
+            Content-Length:
+              description: '**Optional.** Present only in data centers that know the file size up front;
+                when absent the response is chunked.
+
+                '
+              schema:
+                type: integer
+                format: int64
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '206':
+          description: '**Optional capability.** Returned only by data centers with `Accept-Ranges: bytes`;
+            a request with `Range` may still get `200`, and clients must handle whichever status code
+            actually arrives.
+
+            '
+          headers:
+            Content-Range:
+              description: '`bytes <start>-<end>/<total>`'
+              schema:
+                type: string
+            Content-Length:
+              description: Byte count of this range
+              schema:
+                type: integer
+                format: int64
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '400':
+          $ref: '#/components/responses/SandboxFileBadRequest'
+        '401':
+          $ref: '#/components/responses/SandboxFileUnauthorized'
+        '403':
+          $ref: '#/components/responses/SandboxFileForbidden'
+        '404':
+          $ref: '#/components/responses/SandboxFileNotFound'
+        '416':
+          description: '**Optional capability**, returned only by data centers that support resuming:
+            the `Range` start is beyond the file length.
+
+            '
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SandboxFileError'
+        '429':
+          $ref: '#/components/responses/SandboxFileRateLimited'
+        '500':
+          $ref: '#/components/responses/SandboxFileInternalError'
+        '502':
+          $ref: '#/components/responses/SandboxFileUpstreamError'
+    post:
+      tags:
+      - Sandbox-Files
+      summary: Upload a sandbox file
+      description: 'Writes one file to the given absolute path inside the sandbox via `multipart/form-data`,
+        overwriting any existing file.
+
+
+        Authentication, host, and the error envelope are identical to the download endpoint (see `GET
+        /files`).
+
+
+        ## Request constraints
+
+
+        - **The target path is given only in the `path` query parameter.** Including an additional `path`
+        form field in the body is rejected (`400`): when the two sources disagree there is no way to know
+        which to trust, and failing is better than guessing.
+
+        - The request body must be `multipart/form-data`; any other `Content-Type` returns `415`.
+
+        - One file per request.
+
+        - **No chunked/resumable upload.** There is no `Range` semantics for uploads; an interrupted upload
+        must be resent in full. A data center may enforce a per-file size limit and return `413` when
+        exceeded; the limit is not exposed through the API.
+
+        '
+      operationId: uploadSandboxFile
+      security:
+      - sandboxAccessToken: []
+      parameters:
+      - $ref: '#/components/parameters/SandboxFilePathQueryParam'
+      - $ref: '#/components/parameters/SandboxFileUsernameQueryParam'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required:
+              - file
+              properties:
+                file:
+                  type: string
+                  format: binary
+                  description: The file content.
+            encoding:
+              file:
+                contentType: application/octet-stream
+      responses:
+        '200':
+          description: 'Write complete. The array shape exists for compatibility with existing SDKs; it
+            currently always holds a single element.
+
+            '
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SandboxFileEntry'
+              example:
+              - path: /home/user/data.bin
+                name: data.bin
+                type: file
+        '400':
+          $ref: '#/components/responses/SandboxFileBadRequest'
+        '401':
+          $ref: '#/components/responses/SandboxFileUnauthorized'
+        '403':
+          $ref: '#/components/responses/SandboxFileForbidden'
+        '404':
+          $ref: '#/components/responses/SandboxFileNotFound'
+        '413':
+          description: The file exceeds the data center's per-file size limit.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SandboxFileError'
+        '415':
+          description: The request body is not `multipart/form-data`.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SandboxFileError'
+        '429':
+          $ref: '#/components/responses/SandboxFileRateLimited'
+        '500':
+          $ref: '#/components/responses/SandboxFileInternalError'
+        '502':
+          $ref: '#/components/responses/SandboxFileUpstreamError'
+        '507':
+          description: The sandbox is out of disk space.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SandboxFileError'
+  /products:
+    get:
+      tags:
+      - SandboxTemplate
+      summary: List the product catalog (unified, tenant-facing)
+      description: 'Unified product catalog query: identity, display name, status and
+
+        resources per product. This is a config-plane read view for tenants —
+
+        it carries no inventory and no purchasability judgement; whether a
+
+        given operation may use a product is answered by that operation''s own
+
+        validation. `status` is externally two-valued: `active` /
+
+        `unavailable` (internal operational states are not exposed).
+
+
+        The contract covers all resource types; this release serves
+
+        `resource_type=sandbox` only (also the default), other values return
+
+        400.
+
+        '
+      operationId: listProductCatalog
+      parameters:
+      - $ref: '#/components/parameters/IdcNameRequiredQueryParam'
+      - name: resource_type
+        in: query
+        description: Resource type to list. Only `sandbox` is served in this release.
+        schema:
+          type: string
+          enum:
+          - sandbox
+          default: sandbox
+      - name: include_unavailable
+        in: query
+        description: Include products whose status is `unavailable`.
+        schema:
+          type: boolean
+          default: false
+      responses:
+        '200':
+          description: Product catalog entries were returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProductCatalogListResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /templates:
+    post:
+      tags:
+      - SandboxTemplate
+      summary: Create a Template and start its initial Build
+      description: "Creates a logical Template together with its initial Build. The initial\nBuild is created\
+        \ and started from the required `build` definition in the\nsame request.\n\n`Idempotency-Key`\
+        \ is required and acts as the idempotency key because Template\ncreation can complete after an\
+        \ upstream timeout; a keyless retry would build a\nsecond Template. Repeating the request with\
+        \ identical parameters replays the\nsame Template/Build (with `Idempotency-Replayed: true`); a\
+        \ different body under\nthe same key returns 400 `Sandbox.IdempotentParameterMismatch`; after\
+        \ the\nTemplate is deleted the key answers 409 `Sandbox.IdempotentKeyConsumed`. Keys\nare remembered\
+        \ for 24 hours. (`X-Request-ID` is trace-only and server-generated.)\n\n`resources` supports two\
+        \ mutually exclusive forms:\n\n- Preset: `{\"type\":\"preset\",\"product\":\"gmi.sandbox.x-large\"\
+        }`. The\n  `product` value is the catalog SKU (see `GET /api/v2/products`); the\n  service resolves\
+        \ the active entry from the product catalog. Preset values are\
+        \ used as configured and\n  are not constrained by custom resource limits.\n- Custom: `{\"type\"\
+        :\"custom\",\"cpu_count\":4,\"memory_mb\":8192,\n  \"disk_size_mb\":32768,\"architecture\":\"\
+        x86_64\"}`. All three numeric\n  fields are required. Custom resources are limited to 16 vCPU,\n\
+        \  65536 MiB memory, and 65536 MiB boot disk, and must also be\n  representable by the selected\
+        \ IDC.\n"
+      operationId: createTemplate
+      parameters:
+      - $ref: '#/components/parameters/IdempotencyKeyRequiredParam'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateTemplateRequest'
+      responses:
+        '201':
+          description: 'The Template record is created and immediately addressable: `GET
+
+            /templates/{id}` works right away. Build readiness is reported by
+
+            `status`, not by the status code.
+
+            '
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateMutationAccepted'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '422':
+          $ref: '#/components/responses/Unsupported'
+        '429':
+          $ref: '#/components/responses/QuotaExceeded'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '502':
+          $ref: '#/components/responses/UpstreamError'
+    get:
+      tags:
+      - SandboxTemplate
+      summary: List Templates
+      description: 'Lists Templates visible to the authenticated organization. Results are
+
+        sorted by creation time in descending order. Internal artifact IDs are
+
+        never returned.
+
+        '
+      operationId: listTemplates
+      parameters:
+      - $ref: '#/components/parameters/IdcNameQueryParam'
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Templates were returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplatePage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /templates/{id}:
+    parameters:
+    - $ref: '#/components/parameters/TemplateIdPathParam'
+    - $ref: '#/components/parameters/IdcNameQueryParam'
+    get:
+      tags:
+      - SandboxTemplate
+      summary: Get a Template
+      description: Returns the logical Template and its current and latest Build references.
+      operationId: getTemplate
+      responses:
+        '200':
+          description: The Template was returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    patch:
+      tags:
+      - SandboxTemplate
+      summary: Update mutable Template metadata
+      description: 'Updates mutable metadata only (`name`, `description`, `labels`).
+
+        IDC, source, resource specification, and existing Build definitions
+
+        are immutable. This is a metadata-only update.
+
+
+        Renaming to a name already used by another Template in the same
+
+        organization and IDC returns 409.
+
+        '
+      operationId: updateTemplate
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateTemplateRequest'
+      responses:
+        '200':
+          description: The Template was updated successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+    delete:
+      tags:
+      - SandboxTemplate
+      summary: Delete a Template
+      description: 'Soft-deletes the Template so it disappears from tenant-visible lists.
+
+        Existing Sandboxes are not affected because their effective Template
+
+        configuration is copied at creation time.
+
+
+        Build artifact reclaim is attempted before completing the
+
+        logical delete. When the selected IDC cannot reclaim an artifact, the
+
+        Build remains with `artifact_state=retained` after soft-delete. When
+
+        reclaim is blocked by a dependent resource, the request fails with
+
+        `Template.HasDependents` (409) and nothing is soft-deleted.
+
+
+        Deletion is also rejected while a Build is in progress, and when
+
+        dependent resources still reference the Template''s Builds (for
+
+        example child Templates, Snapshots, or live Sandboxes).
+
+        '
+      operationId: deleteTemplate
+      responses:
+        '200':
+          description: 'Deletion completed synchronously: the Template is soft-deleted and
+
+            the Build artifact reclaim attempt has already settled. There is
+
+            nothing left to poll.
+
+            '
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateDeletionAccepted'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /templates/{template_id}/builds:
+    parameters:
+    - $ref: '#/components/parameters/TemplateBuildTemplateIdPathParam'
+    get:
+      tags:
+      - SandboxTemplate
+      summary: List Template Builds
+      description: Lists immutable Build attempts in reverse chronological order.
+      operationId: listTemplateBuilds
+      parameters:
+      - $ref: '#/components/parameters/PageParam'
+      - $ref: '#/components/parameters/PageSizeParam'
+      responses:
+        '200':
+          description: Builds were returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildPage'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+  /templates/{template_id}/builds/{id}:
+    parameters:
+    - $ref: '#/components/parameters/TemplateBuildTemplateIdPathParam'
+    - $ref: '#/components/parameters/BuildIdPathParam'
+    get:
+      tags:
+      - SandboxTemplate
+      summary: Get a Template Build
+      description: Returns normalized Build status and artifact availability.
+      operationId: getTemplateBuild
+      responses:
+        '200':
+          description: The Build was returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TemplateBuildResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '502':
+          $ref: '#/components/responses/UpstreamError'
+  /templates/{template_id}/builds/{id}/logs:
+    parameters:
+    - $ref: '#/components/parameters/TemplateBuildTemplateIdPathParam'
+    - $ref: '#/components/parameters/BuildIdPathParam'
+    get:
+      tags:
+      - SandboxTemplate
+      summary: Get live Template Build logs
+      description: "Returns live logs for a Template Build. Results are filtered and paged\
+        \ server-side.\n"
+      operationId: getTemplateBuildLogs
+      parameters:
+      - name: offset
+        in: query
+        description: Zero-based normalized log entry offset.
+        schema:
+          type: integer
+          format: int64
+          minimum: 0
+          default: 0
+      - name: limit
+        in: query
+        description: Maximum number of log entries to return.
+        schema:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 100
+      - name: level
+        in: query
+        description: Optional normalized log level filter.
+        schema:
+          type: string
+          enum:
+          - debug
+          - info
+          - warn
+          - error
+      responses:
+        '200':
+          description: Build logs were returned successfully.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BuildLogPageResponse'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '410':
+          $ref: '#/components/responses/ArtifactReclaimed'
+        '500':
+          $ref: '#/components/responses/InternalError'
+        '502':
+          $ref: '#/components/responses/UpstreamError'
+components:
+  parameters:
+    BuildIdPathParam:
+      name: id
+      in: path
+      required: true
+      description: Template Build identifier.
+      schema:
+        type: string
+        format: uuid
+    IdcNameQueryParam:
+      name: idc_name
+      in: query
+      description: Filter by data center name, e.g. us-denver-1
+      schema:
+        type: string
+    IdcNameRequiredQueryParam:
+      name: idc_name
+      in: query
+      required: true
+      description: IDC identifier used for capability and resource resolution.
+      schema:
+        type: string
+    IdempotencyKeyOptionalParam:
+      name: Idempotency-Key
+      in: header
+      required: false
+      description: 'Optional caller-generated idempotency key (a UUID is recommended).
+
+        Matched byte-for-byte: 1-64 printable ASCII characters, no whitespace.
+
+        Absent means no deduplication. The same key with a different request
+
+        body returns 400 Sandbox.IdempotentParameterMismatch. Echoed on
+
+        responses; replays add Idempotency-Replayed: true. Keys are remembered
+
+        for 24 hours.
+
+        '
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+    IdempotencyKeyRequiredParam:
+      name: Idempotency-Key
+      in: header
+      required: true
+      description: 'Caller-generated key that makes the mutation safe to retry (a UUID is
+
+        recommended). Matched byte-for-byte: 1-64 printable ASCII characters,
+
+        no whitespace. The same key with a different request body returns 400
+
+        Sandbox.IdempotentParameterMismatch. Echoed on responses; replays add
+
+        Idempotency-Replayed: true. Keys are remembered for 24 hours.
+
+        '
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 64
+    PageParam:
+      name: page
+      in: query
+      description: Page number, starting from 1; default 1
+      schema:
+        type: integer
+        minimum: 1
+        default: 1
+    PageSizeParam:
+      name: page_size
+      in: query
+      description: Items per page; default 20, maximum 100
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    SandboxExecExecutionIDParam:
+      name: execution_id
+      in: path
+      required: true
+      description: Public execution identifier returned by the create operation.
+      schema:
+        type: string
+        format: uuid
+    SandboxExecRequestIDParam:
+      name: X-Request-ID
+      in: header
+      required: false
+      description: Optional request correlation identifier echoed in the response.
+      schema:
+        type: string
+        minLength: 1
+        maxLength: 128
+    SandboxExecWaitParam:
+      name: wait
+      in: query
+      required: false
+      description: Wait for a terminal result before responding. Defaults to false.
+      schema:
+        type: boolean
+        default: false
+    SandboxExecWaitTimeoutParam:
+      name: wait_timeout_seconds
+      in: query
+      required: false
+      description: 'Maximum time to wait when `wait=true`, in seconds. Values from 1 through 25
+
+        are accepted. A wait timeout never cancels the execution.
+
+        '
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 25
+        default: 25
+    SandboxFilePathQueryParam:
+      name: path
+      in: query
+      required: true
+      description: '**Absolute path** inside the sandbox. Must start with `/`; relative segments such
+        as `.` / `..` are rejected. No semantic interpretation is applied beyond existence checks; for
+        writes, the parent directory must already exist.
+
+        '
+      schema:
+        type: string
+        minLength: 1
+      example: /home/user/data.bin
+    SandboxFileUsernameQueryParam:
+      name: username
+      in: query
+      required: false
+      description: 'Perform the file operation as this user; defaults to the sandbox''s default user.
+        **Optional capability**: some data centers ignore this parameter and always act as the default
+        user, so do not rely on it for permission isolation.
+
+        '
+      schema:
+        type: string
+      example: user
+    SandboxIdPathParam:
+      name: id
+      in: path
+      required: true
+      description: Unique sandbox resource ID (UUID; the `id` field of the create response). The data-plane
+        key (`sandbox_key`) cannot be used here.
+      schema:
+        type: string
+        format: uuid
+      example: 3f6f0d3e-6f0a-4a2e-9c58-0d3e6f0a4a2e
+    TemplateBuildTemplateIdPathParam:
+      name: template_id
+      in: path
+      required: true
+      description: Owning Template identifier.
+      schema:
+        type: string
+        format: uuid
+    TemplateIdPathParam:
+      name: id
+      in: path
+      required: true
+      description: Template identifier.
+      schema:
+        type: string
+        format: uuid
+  responses:
+    ArtifactReclaimed:
+      description: The Build artifact and its live logs are no longer available.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    BadRequest:
+      description: Invalid request parameters
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: Parameter.Invalid
+            message: Invalid request parameters
+            request_id: req-xxxx
+    Conflict:
+      description: State conflict
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: Resource.StateConflict
+            message: Resource state conflict
+            request_id: req-xxxx
+    Forbidden:
+      description: The caller cannot access the organization-scoped resource.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    InternalError:
+      description: Internal server error
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: Internal.ServerError
+            message: An internal server error occurred
+            request_id: req-xxxx
+    NotFound:
+      description: Resource not found
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: Resource.NotFound
+            message: The requested resource was not found
+            request_id: req-xxxx
+    UpstreamError:
+      description: An upstream Sandbox service is unavailable or returned an error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    QuotaExceeded:
+      description: The configured or temporary resource quota would be exceeded.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    SandboxExecBadRequest:
+      description: Invalid execution request or query parameter.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SandboxExecErrorResponse'
+    SandboxExecConflict:
+      description: The execution is already terminal and cannot be canceled.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SandboxExecErrorResponse'
+    SandboxExecInternalError:
+      description: The execution service failed to complete the request.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SandboxExecErrorResponse'
+    SandboxExecNotFound:
+      description: Execution does not exist or is not owned by this sandbox.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SandboxExecErrorResponse'
+    SandboxExecRateLimited:
+      description: The request was rate-limited.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SandboxExecErrorResponse'
+    SandboxExecUnauthorized:
+      description: Missing or invalid X-Access-Token.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SandboxExecErrorResponse'
+    SandboxFileBadRequest:
+      description: 'Invalid request: `path` is missing, is not an absolute path, or the upload body carries
+        a duplicate `path` field.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SandboxFileError'
+    SandboxFileForbidden:
+      description: The token is valid, but file permissions inside the sandbox do not allow the operation.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SandboxFileError'
+    SandboxFileInternalError:
+      description: Data-plane internal error.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SandboxFileError'
+    SandboxFileNotFound:
+      description: 'The target file or its parent directory does not exist, or the sandbox is no longer
+        available (deleted/stopped). These cases are likewise not distinguished.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SandboxFileError'
+    SandboxFileRateLimited:
+      description: Data-plane rate limit hit; back off and retry.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SandboxFileError'
+    SandboxFileUnauthorized:
+      description: '`X-Access-Token` is missing, malformed, expired, or does not belong to this sandbox.
+
+
+        **All of these cases return exactly the same status code and message**, so they cannot be told
+        apart. This is deliberate: distinguishable errors would let callers use this endpoint as a sandbox-existence
+        probe.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SandboxFileError'
+    SandboxFileUpstreamError:
+      description: 'The data plane''s own backend call failed. **This is a server-side problem, not a
+        caller credential problem** — re-fetching the token will not help; back off and retry, or report
+        it.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SandboxFileError'
+    SandboxMutationFailed:
+      description: 'A runtime mutation started but was deterministically rejected by the backing infrastructure.
+        The top level is the platform''s standard error envelope; `details` additionally carries `state`
+        and `last_mutation`, indicating the sandbox is still running while this operation failed.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/SandboxMutationErrorResponse'
+          example:
+            code: Resource.StateConflict
+            message: 'Sandbox state conflict: current updating, required running'
+            request_id: req-xxxx
+            details:
+              state: running
+              last_mutation:
+                type: set_timeout
+                status: failed
+                error_code: invalid_argument
+                message: timeout update rejected by runtime
+                completed_at: '2026-08-13T09:12:31Z'
+    Unauthorized:
+      description: Unauthenticated
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: Auth.Unauthorized
+            message: Authentication required
+            request_id: req-xxxx
+    UnprocessableEntity:
+      description: The request is valid, but the requested capability is not supported in the selected environment.
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+          example:
+            code: Template.ProviderNotSupported
+            message: The selected IDC does not support this template operation
+            request_id: req-xxxx
+    Unsupported:
+      description: 'The request is valid but the selected IDC does not support
+
+        the requested capability or resolved resource specification.
+
+        '
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    ArtifactState:
+      type: string
+      enum:
+      - absent
+      - unknown
+      - available
+      - reclaimed
+      - retained
+      description: 'Build artifact availability independent of Build status.
+
+        `retained` means the Build was logically deleted but the artifact was
+
+        left in place; `reclaimed` means the artifact was hard-deleted.
+
+        '
+    BuildDefinition:
+      type: object
+      additionalProperties: false
+      required:
+      - source
+      properties:
+        source:
+          $ref: '#/components/schemas/BuildSource'
+        commands:
+          type: array
+          maxItems: 100
+          description: Shell command strings executed sequentially during the Build.
+          items:
+            type: string
+            minLength: 1
+            maxLength: 8192
+        envs:
+          type: object
+          maxProperties: 256
+          additionalProperties:
+            type: string
+            maxLength: 32768
+          description: 'Environment variables available only during the Template Build.
+
+            They are visible to subsequent build commands/steps and are not persisted
+
+            into the resulting template artifact as sandbox runtime environment
+
+            variables. Pass runtime env when creating a Sandbox instead. Write-only:
+
+            values are never returned on Template or TemplateBuild responses.
+
+            Keys must be unique (JSON object); the server orders them
+
+            deterministically by key. Key names must match
+
+            `[A-Za-z_][A-Za-z0-9_]*`.
+
+            '
+        start_cmd:
+          type: string
+          minLength: 1
+          maxLength: 8192
+          description: 'Launch command persisted with the Build and applied when Sandboxes
+
+            created from this Template start.
+
+            '
+    BuildFailure:
+      type: object
+      nullable: true
+      additionalProperties: false
+      required:
+      - code
+      - message
+      properties:
+        code:
+          type: string
+          description: Stable failure code.
+          example: TemplateBuild.OutOfMemory
+        message:
+          type: string
+          description: Sanitized failure message.
+    BuildLogEntry:
+      type: object
+      additionalProperties: false
+      required:
+      - offset
+      - level
+      - message
+      properties:
+        offset:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Normalized zero-based log entry offset.
+        timestamp:
+          type: string
+          format: date-time
+          nullable: true
+          description: Log time in UTC when available.
+        level:
+          type: string
+          enum:
+          - debug
+          - info
+          - warn
+          - error
+          description: Normalized log level.
+        message:
+          type: string
+          description: Sanitized log message.
+    BuildLogPage:
+      type: object
+      additionalProperties: false
+      required:
+      - entries
+      - next_offset
+      - has_more
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/BuildLogEntry'
+        next_offset:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Offset to use for the next request.
+        has_more:
+          type: boolean
+          description: Whether more log entries are currently available.
+    BuildLogPageResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - request_id
+      - data
+      properties:
+        request_id:
+          type: string
+          description: HTTP request correlation identifier.
+        data:
+          $ref: '#/components/schemas/BuildLogPage'
+    BuildPage:
+      type: object
+      additionalProperties: false
+      required:
+      - request_id
+      - total
+      - page
+      - page_size
+      - items
+      properties:
+        request_id:
+          type: string
+          description: HTTP request correlation identifier.
+        total:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Total number of Build attempts for the Template.
+        page:
+          type: integer
+          minimum: 1
+          description: One-based page number.
+        page_size:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: Requested number of Builds per page.
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/TemplateBuild'
+    BuildSource:
+      oneOf:
+      - $ref: '#/components/schemas/ImageSource'
+      - $ref: '#/components/schemas/TemplateSource'
+      discriminator:
+        propertyName: type
+        mapping:
+          image: '#/components/schemas/ImageSource'
+          template: '#/components/schemas/TemplateSource'
+      description: Manual Build source. Sandbox sources use the snapshot endpoint.
+    BuildSourceType:
+      type: string
+      enum:
+      - image
+      - template
+      - sandbox
+      description: Build lineage type.
+    BuildStatus:
+      type: string
+      enum:
+      - waiting
+      - building
+      - ready
+      - error
+      description: Normalized Template Build status.
+    BuildTrigger:
+      type: string
+      enum:
+      - initial_build
+      - rebuild
+      - snapshot
+      description: Operation that created the Build.
+    ConnectSandboxControlRequest:
+      type: object
+      properties:
+        timeout:
+          type: integer
+          format: int64
+          description: When greater than 0, extends the lifetime of a running sandbox (extend-only, never
+            shortens).
+    ConnectSandboxControlResponse:
+      type: object
+      required:
+      - request_id
+      - data
+      properties:
+        request_id:
+          type: string
+          description: Request tracing ID
+        data:
+          $ref: '#/components/schemas/ConnectSandboxControlResult'
+    ConnectSandboxControlResult:
+      type: object
+      description: 'Same shape as the creation response: identity and data-plane entry point only — no
+        template alias, no backing node identifiers, no agent version. Those are backend concepts the
+        caller can neither act on nor interpret.
+
+        '
+      required:
+      - id
+      - sandbox_key
+      - template_id
+      - domain
+      - sandbox_access_token
+      - traffic_access_token
+      - end_at
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique sandbox resource ID (UUID), used both in control-plane path parameters and
+            as the billing resource_id.
+        sandbox_key:
+          type: string
+          description: 'Data-plane addressing key (an `i` followed by a 20-character random string). Used
+            solely to assemble data-plane URLs: `https://{sandbox_key}.{domain}` and `https://{port}-{sandbox_key}.{domain}`.
+            Control-plane endpoints always use `id` and do not accept this field.
+
+            '
+        template_id:
+          type: string
+        domain:
+          type: string
+          description: 'Sandbox data-plane domain — the host suffix for data-plane endpoints such as `/files`
+            (`https://{sandbox_key}.{domain}`).
+
+
+            Re-read this field and `sandbox_access_token` on every connect; do not reuse values cached
+            from a previous create/connect.
+
+            '
+        sandbox_access_token:
+          type: string
+          description: 'Sandbox data-plane access token (always issued). Sent as the `X-Access-Token`
+            header on `/files`, Sandbox-Exec, and other data-plane endpoints; the control plane (`/api/v2`)
+            does not use it.
+
+
+            The `sandbox_access_token` stays valid for the entire lifetime of the sandbox. Connect may
+            return a new token when it extends the lifetime or repairs drift; always overwrite the local
+            cache with this response instead of assuming it equals the previous create/connect value.
+
+            '
+        traffic_access_token:
+          type: string
+          description: 'Traffic token for non-control ports (issued only when secure=true; sent as the
+            traffic-access-token header). Empty when secure=false.
+
+            '
+        end_at:
+          type: string
+          format: date-time
+          description: 'The authoritative expiry time (UTC) as settled by this connect call. Returned
+            whether or not `timeout` was passed: an extension takes effect only when the requested expiry
+            is later than the current one (extend-only), and when it does not take effect this is simply
+            the unchanged current value — callers cannot derive the effective value from their own request
+            parameters.
+
+            '
+    CreateSandboxControlRequest:
+      type: object
+      required:
+      - template_id
+      properties:
+        template_id:
+          type: string
+          description: Template identifier or name. A snapshot-as-template `snapshotID` is also valid
+            here.
+        idc_name:
+          type: string
+          description: 'Target data center name, e.g. us-central1-c. Optional: when omitted, the organization''s
+            configured default data center is used (maintained by the platform administrator); if the
+            organization has no default configured, the request returns 400. Note that Templates are bound
+            to a data center: the effective data center (whether explicit or default) must match the one
+            that owns the Template referenced by `template_id`, otherwise the request is treated as template-not-found.
+
+            '
+        timeout:
+          type: integer
+          format: int64
+          description: Time-to-live in seconds. When omitted or 0 or less, 300 seconds is used.
+        env_vars:
+          type: object
+          additionalProperties:
+            type: string
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+          description: Customer-defined key/value pairs; the platform does not interpret them. The list
+            endpoint can filter by them.
+    CreateSandboxControlResponse:
+      type: object
+      required:
+      - request_id
+      - data
+      properties:
+        request_id:
+          type: string
+          description: Request tracing ID
+        data:
+          $ref: '#/components/schemas/CreateSandboxControlResult'
+    CreateSandboxControlResult:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique sandbox resource ID (UUID), used both in control-plane path parameters and
+            as the billing resource_id.
+        sandbox_key:
+          type: string
+          description: 'Data-plane addressing key (an `i` followed by a 20-character random string). Used
+            solely to assemble data-plane URLs: `https://{sandbox_key}.{domain}` and `https://{port}-{sandbox_key}.{domain}`.
+            Control-plane endpoints always use `id` and do not accept this field.
+
+            '
+        template_id:
+          type: string
+          description: Template ID
+        domain:
+          type: string
+          description: 'Sandbox data-plane domain. It is the host suffix for data-plane endpoints such
+            as `/files` (`https://{sandbox_key}.{domain}`) and for port services (`https://{port}-{sandbox_key}.{domain}`).
+
+            '
+        sandbox_access_token:
+          type: string
+          description: 'Sandbox data-plane access token (always issued). Sent as the `X-Access-Token`
+            header on `/files`, Sandbox-Exec, and other data-plane endpoints; the control plane (`/api/v2`)
+            does not use it.
+
+
+            The token returned by create stays valid for the entire lifetime of the sandbox. If the lifetime
+            is later extended via connect or `POST .../timeout`, call the connect endpoint to obtain a
+            new token.
+
+            '
+        traffic_access_token:
+          type: string
+          description: 'Traffic token for non-control ports (issued only when secure=true; sent as the
+            traffic-access-token header). Empty when secure=false.
+
+            '
+    CreateTemplateRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - name
+      - resources
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: ^[A-Za-z0-9_-]+$
+          description: Organization-scoped Template display name.
+        description:
+          type: string
+          maxLength: 256
+          description: Human-readable Template description.
+        idc_name:
+          type: string
+          description: 'IDC that permanently owns the Template. Optional: omitted, empty, and whitespace-only
+            values are equivalent — the organization''s configured default data center is used (maintained
+            by the platform administrator; the same setting used by sandbox creation). If the organization
+            has no default configured, the request returns 400.
+
+            '
+        resources:
+          $ref: '#/components/schemas/ResourceSelection'
+        labels:
+          type: object
+          maxProperties: 64
+          description: User-defined labels used for filtering.
+          additionalProperties:
+            type: string
+            maxLength: 256
+        build:
+          allOf:
+          - $ref: '#/components/schemas/BuildDefinition'
+          description: 'Initial Build definition created and started with the Template
+
+            (combined flow, every IDC supports it). Omitting `build` selects the
+
+            split flow: the Template and a `waiting` initial Build are created
+
+            without starting anything, and the Build is started later via
+
+            `POST /templates/{template_id}/builds/{id}`. The split flow is not
+
+            supported in every IDC; unsupported IDCs reject it with 422.
+
+            '
+    CustomResourceSelection:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      - cpu_count
+      - memory_mb
+      - disk_size_mb
+      properties:
+        type:
+          type: string
+          enum:
+          - custom
+        cpu_count:
+          type: integer
+          minimum: 1
+          maximum: 16
+          description: 'Requested integer vCPU count. Custom resources allow at most
+
+            16 vCPU.
+
+            '
+        memory_mb:
+          type: integer
+          minimum: 1
+          maximum: 65536
+          description: 'Requested integer memory size in MiB. Custom resources allow at
+
+            most 65536 MiB (64 GiB).
+
+            '
+        disk_size_mb:
+          type: integer
+          minimum: 1
+          maximum: 65536
+          description: 'Requested integer boot disk size in MiB. Custom resources allow at
+
+            most 65536 MiB (64 GiB).
+
+            '
+        architecture:
+          type: string
+          enum:
+          - x86_64
+          - arm64
+          default: x86_64
+          description: 'Requested CPU architecture. If omitted, x86_64 is used. The
+
+            selected IDC must support the value.
+
+            '
+    EffectiveResources:
+      type: object
+      additionalProperties: false
+      required:
+      - cpu_count
+      - memory_mb
+      - disk_size_mb
+      - architecture
+      properties:
+        cpu_count:
+          type: integer
+          minimum: 1
+          description: 'Effective integer vCPU count. Operator-managed presets do not use
+
+            the custom-resource maximum.
+
+            '
+        memory_mb:
+          type: integer
+          minimum: 1
+          description: 'Effective memory size in MiB. Operator-managed presets are not
+
+            constrained by custom-resource limits.
+
+            '
+        disk_size_mb:
+          type: integer
+          minimum: 1
+          description: 'Effective boot disk size in MiB. Operator-managed presets are not
+
+            constrained by custom-resource limits.
+
+            '
+        architecture:
+          type: string
+          enum:
+          - x86_64
+          - arm64
+          description: 'CPU architecture resolved for the selected IDC.
+
+            '
+    ErrorResponse:
+      type: object
+      required:
+      - code
+      - message
+      - request_id
+      properties:
+        code:
+          type: string
+          description: Machine-readable business error code
+          example: Resource.QuotaExceeded
+        message:
+          type: string
+          description: Human-readable error description
+          example: The resource quota is not enough.
+        request_id:
+          type: string
+          description: Tracing ID
+          example: req-xxxx
+        details:
+          type: object
+          description: Field-level error details
+          additionalProperties: true
+    ImageSource:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      - image
+      properties:
+        type:
+          type: string
+          enum:
+          - image
+        image:
+          type: string
+          minLength: 1
+          description: 'Debian or Ubuntu container image reference. The server validates
+
+            the image against the IDC-supported base OS policy.
+
+            '
+    ListSandboxesControlResponse:
+      type: object
+      required:
+      - request_id
+      - total
+      - page
+      - page_size
+      - items
+      properties:
+        request_id:
+          type: string
+          description: Request tracing ID
+        total:
+          type: integer
+          description: Total number of active sandboxes
+        page:
+          type: integer
+        page_size:
+          type: integer
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/SandboxControlSummary'
+    PresetResourceSelection:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      - product
+      properties:
+        type:
+          type: string
+          enum:
+          - preset
+        product:
+          type: string
+          description: 'Sandbox product specification id (catalog SKU, for example
+
+            `gmi.sandbox.x-large`).
+
+            '
+    ProductCatalogItem:
+      type: object
+      additionalProperties: false
+      required:
+      - resource_type
+      - product
+      - name
+      - status
+      - resources
+      description: 'One product catalog entry: identity, display name, externally-visible
+
+        status and effective resources. Carries no inventory and no
+
+        purchasability judgement.
+
+        '
+      properties:
+        resource_type:
+          type: string
+          enum:
+          - sandbox
+          description: Resource type of this entry. Only `sandbox` is served in this release.
+        product:
+          type: string
+          description: Catalog SKU (for example `gmi.sandbox.x-large`).
+        name:
+          type: string
+          description: Display name of the product (for sandbox, the preset label such as `SMALL`).
+        status:
+          type: string
+          enum:
+          - active
+          - unavailable
+          description: 'Externally two-valued status. `active` = on sale; `unavailable`
+
+            covers every internal non-usable state.
+
+            '
+        resources:
+          $ref: '#/components/schemas/EffectiveResources'
+    ProductCatalogListResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - request_id
+      - data
+      properties:
+        request_id:
+          type: string
+          description: HTTP request correlation identifier.
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProductCatalogItem'
+    ResourceSelection:
+      oneOf:
+      - $ref: '#/components/schemas/PresetResourceSelection'
+      - $ref: '#/components/schemas/CustomResourceSelection'
+      discriminator:
+        propertyName: type
+        mapping:
+          preset: '#/components/schemas/PresetResourceSelection'
+          custom: '#/components/schemas/CustomResourceSelection'
+      description: 'Resource values may be selected by catalog product SKU or supplied as a
+
+        custom configuration. Active presets use operator-managed IDC product
+
+        values without custom-resource limit validation. Only custom values
+
+        must pass the 16 vCPU / 64 GiB memory / 64 GiB boot disk limits and the
+
+        selected IDC''s representability checks.
+
+        '
+    ResourceSpecName:
+      type: string
+      enum:
+      - X_SMALL
+      - SMALL
+      - MEDIUM
+      - LARGE
+      - X_LARGE
+      description: Stable human-readable Sandbox resource specification label.
+    SandboxControlDetail:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique sandbox resource ID (UUID), used both in control-plane path parameters and
+            as the billing resource_id.
+        sandbox_key:
+          type: string
+          description: 'Data-plane addressing key (an `i` followed by a 20-character random string). Used
+            solely to assemble data-plane URLs: `https://{sandbox_key}.{domain}` and `https://{port}-{sandbox_key}.{domain}`.
+            Control-plane endpoints always use `id` and do not accept this field.
+
+            '
+        template_id:
+          type: string
+        idc_name:
+          type: string
+        state:
+          $ref: '#/components/schemas/SandboxControlState'
+        product:
+          type: string
+          description: Catalog SKU when created from a preset; empty for custom resources.
+        product_name:
+          type: string
+          description: Preset label when created from a preset; empty for custom resources.
+        resources:
+          $ref: '#/components/schemas/SandboxResources'
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+          description: Customer-defined key/value pairs; the platform does not interpret them. The list
+            endpoint can filter by them.
+        latest_operation:
+          $ref: '#/components/schemas/SandboxMutationResult'
+        failure:
+          $ref: '#/components/schemas/SandboxFailure'
+        created_at:
+          type: string
+          description: Time the request was accepted, UTC
+        running_at:
+          type: string
+          description: Time the instance was confirmed running; empty string while not yet running
+        started_at:
+          type: string
+          description: UTC timestamp, e.g. 2026-08-04T09:12:31.123456789Z
+        end_at:
+          type: string
+          description: UTC timestamp; the expiry time
+        domain:
+          type: string
+    SandboxControlDetailResponse:
+      type: object
+      required:
+      - request_id
+      - data
+      properties:
+        request_id:
+          type: string
+          description: Request tracing ID
+        data:
+          $ref: '#/components/schemas/SandboxControlDetail'
+    SandboxControlState:
+      type: string
+      description: 'External lifecycle state. The internal `creating` state is expressed externally as
+        `provisioning` (the instance is being prepared and is not usable yet); backend queueing is not
+        expressed separately and is also folded into `provisioning`.
+
+
+        `deleting` is not listed here: once deletion is accepted the instance is no longer queryable (the
+        detail endpoint returns 404), and that state appears only in the deletion endpoint''s acceptance
+        response. Suspend-related states likewise never appear — suspend is not offered externally.
+
+        '
+      enum:
+      - provisioning
+      - running
+      - checkpointing
+      - updating
+      - failed
+    SandboxControlSummary:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          description: Unique sandbox resource ID (UUID), used both in control-plane path parameters and
+            as the billing resource_id.
+        sandbox_key:
+          type: string
+          description: 'Data-plane addressing key (an `i` followed by a 20-character random string). Used
+            solely to assemble data-plane URLs: `https://{sandbox_key}.{domain}` and `https://{port}-{sandbox_key}.{domain}`.
+            Control-plane endpoints always use `id` and do not accept this field.
+
+            '
+        template_id:
+          type: string
+        idc_name:
+          type: string
+        state:
+          $ref: '#/components/schemas/SandboxControlState'
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+        created_at:
+          type: string
+        running_at:
+          type: string
+    SandboxDeleteAcceptedResponse:
+      type: object
+      required:
+      - request_id
+      - data
+      properties:
+        request_id:
+          type: string
+        data:
+          type: object
+          properties:
+            id:
+              type: string
+              format: uuid
+            state:
+              type: string
+              example: deleting
+    SandboxExecAcceptedResponse:
+      type: object
+      required:
+      - execution_id
+      - sandbox_id
+      - status
+      properties:
+        request_id:
+          type: string
+          description: Echo of X-Request-ID when supplied.
+        execution_id:
+          type: string
+          format: uuid
+          description: Public execution identifier.
+        sandbox_id:
+          type: string
+          description: Echo of the data-plane addressing key (i.e. `sandbox_key`; the data plane identifies
+            the instance by the key in the host).
+        status:
+          $ref: '#/components/schemas/SandboxExecStatus'
+    SandboxExecErrorResponse:
+      type: object
+      required:
+      - code
+      - message
+      properties:
+        code:
+          type: string
+          description: Machine-readable execution error code.
+          example: Execution.InvalidRequest
+        message:
+          type: string
+          description: Sanitized human-readable error message.
+        request_id:
+          type: string
+          description: Request correlation identifier.
+        details:
+          type: object
+          additionalProperties: true
+    SandboxExecRequest:
+      type: object
+      additionalProperties: false
+      required:
+      - action
+      - parameters
+      properties:
+        action:
+          type: string
+          enum:
+          - exec
+          description: Execution action. The sealed data plane currently supports exec only.
+        parameters:
+          type: object
+          additionalProperties: false
+          required:
+          - command
+          properties:
+            command:
+              type: string
+              description: Shell command to execute.
+            envs:
+              type: object
+              additionalProperties:
+                type: string
+              description: Environment variables for the command.
+            cwd:
+              type: string
+              description: Absolute working directory. Defaults to `/home/user`.
+    SandboxExecResultResponse:
+      type: object
+      required:
+      - execution_id
+      - sandbox_id
+      - status
+      - exit_code
+      - stdout
+      - stderr
+      - stdout_truncated
+      - stderr_truncated
+      - started_at
+      - completed_at
+      properties:
+        request_id:
+          type: string
+          description: Echo of X-Request-ID when supplied.
+        execution_id:
+          type: string
+          format: uuid
+        sandbox_id:
+          type: string
+          description: Echo of the data-plane addressing key (i.e. `sandbox_key`; the data plane identifies
+            the instance by the key in the host).
+        status:
+          $ref: '#/components/schemas/SandboxExecStatus'
+        exit_code:
+          type: integer
+          format: int32
+          nullable: true
+          description: Process exit code; null while non-terminal or when canceled.
+        stdout:
+          type: string
+          nullable: true
+          description: Captured standard output, or null while not yet available.
+        stderr:
+          type: string
+          nullable: true
+          description: Captured standard error, or null while not yet available.
+        stdout_truncated:
+          type: boolean
+          nullable: true
+        stderr_truncated:
+          type: boolean
+          nullable: true
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+        completed_at:
+          type: string
+          format: date-time
+          nullable: true
+    SandboxExecStatus:
+      type: string
+      description: Public lifecycle status of a sandbox execution.
+      enum:
+      - pending
+      - running
+      - canceling
+      - succeeded
+      - failed
+      - canceled
+    SandboxFailure:
+      type: object
+      description: Non-empty only when state=failed. The message is sanitized and contains no backend
+        identifiers or internal host addresses.
+      properties:
+        code:
+          type: string
+          example: Parameter.Invalid
+        message:
+          type: string
+        occurred_at:
+          type: string
+    SandboxFileEntry:
+      type: object
+      description: Result entry for a single write.
+      required:
+      - path
+      - name
+      - type
+      properties:
+        path:
+          type: string
+          description: Absolute path of the file inside the sandbox
+          example: /home/user/data.bin
+        name:
+          type: string
+          description: File name (the last segment of `path`)
+          example: data.bin
+        type:
+          type: string
+          enum:
+          - file
+          description: Entry type. Only files are written today, so this is always `file`.
+    SandboxFileError:
+      type: object
+      description: 'Data-plane error body. **It has only `message`** — no `code`, and no platform `{request_id,
+        data}` envelope. This differs from every endpoint under `/api/v2`.
+
+
+        The reason is that the data plane and the control plane are separate entry points: requests do
+        not pass through the platform gateway, so there is no platform `request_id` and no context for
+        producing platform business error codes. Branch on the HTTP status code; `message` is for humans
+        only — its wording is not a contract and must not be used in program logic.
+
+
+        `message` is always the server''s own wording: raw backend error text may contain internal details
+        such as absolute paths inside the sandbox, so it is logged only and never returned.
+
+        '
+      required:
+      - message
+      properties:
+        message:
+          type: string
+          description: Human-readable error text. Not stable; do not parse.
+          example: unauthorized
+    SandboxMutationErrorResponse:
+      description: 'Error response for a failed runtime mutation. The top level keeps the platform''s
+        standard error envelope (ErrorResponse); the sandbox-specific `state` / `last_mutation` go in
+        `details` without altering the top-level structure.
+
+        '
+      allOf:
+      - $ref: '#/components/schemas/ErrorResponse'
+      - type: object
+        properties:
+          details:
+            type: object
+            properties:
+              state:
+                type: string
+                description: The sandbox's actual lifecycle state after this operation failed
+              last_mutation:
+                $ref: '#/components/schemas/SandboxMutationResult'
+    SandboxMutationResult:
+      type: object
+      description: 'The most recent operation and its outcome. status=pending means the command has been
+        accepted but the outcome has not settled yet (asynchronous creation and deletion are in this state
+        right after acceptance).
+
+        '
+      required:
+      - type
+      - status
+      properties:
+        type:
+          type: string
+          enum:
+          - create
+          - delete
+          - set_timeout
+        status:
+          type: string
+          enum:
+          - pending
+          - succeeded
+          - failed
+        error_code:
+          type: string
+          example: invalid_argument
+        message:
+          type: string
+          description: Sanitized failure reason; never contains access tokens
+        completed_at:
+          type: string
+          format: date-time
+    SandboxResources:
+      type: object
+      description: Compute resources. Fixed when the Template Build is created and snapshotted at sandbox
+        creation; immutable afterwards, and the create request cannot override them.
+      properties:
+        vcpu:
+          type: integer
+          format: int64
+        memory_mb:
+          type: integer
+          format: int64
+        disk_mb:
+          type: integer
+          format: int64
+    SetSandboxControlTimeoutRequest:
+      type: object
+      properties:
+        timeout:
+          type: integer
+          format: int64
+          description: Time-to-live in seconds, measured from the current time. When omitted or 0 or less,
+            300 seconds is used.
+    SetSandboxControlTimeoutResponse:
+      type: object
+      required:
+      - request_id
+      - data
+      properties:
+        request_id:
+          type: string
+          description: Request tracing ID
+        data:
+          type: object
+          required:
+          - id
+          - old_end_at
+          - new_end_at
+          properties:
+            id:
+              type: string
+              format: uuid
+              description: Unique sandbox resource ID.
+            old_end_at:
+              type: string
+              format: date-time
+              description: The expiry time (UTC) before this change.
+            new_end_at:
+              type: string
+              format: date-time
+              description: 'The expiry time (UTC) in effect after this change. When a `timeout` of 0 or
+                less is replaced by the default duration, this field is authoritative.
+
+                '
+    Template:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - name
+      - idc_name
+      - source_type
+      - resources
+      - latest_build_id
+      - latest_build_status
+      - created_at
+      - updated_at
+      properties:
+        id:
+          type: string
+          description: Immutable Template identifier.
+        name:
+          type: string
+          description: Organization-scoped display name.
+        description:
+          type: string
+          description: Human-readable Template description.
+        idc_name:
+          type: string
+          description: Immutable owning IDC identifier.
+        source_type:
+          $ref: '#/components/schemas/BuildSourceType'
+        product:
+          type: string
+          nullable: true
+          description: Catalog SKU when created from a preset; null for custom resources.
+        product_name:
+          allOf:
+          - $ref: '#/components/schemas/ResourceSpecName'
+          nullable: true
+          description: Preset label when created from a preset; null for custom resources.
+        resources:
+          $ref: '#/components/schemas/EffectiveResources'
+        labels:
+          type: object
+          additionalProperties:
+            type: string
+        current_build_id:
+          type: string
+          nullable: true
+          description: Latest successful Build used to create new Sandboxes.
+        latest_build_id:
+          type: string
+          description: Most recently created Build, including a failed Build.
+        latest_build_status:
+          $ref: '#/components/schemas/BuildStatus'
+        rebuildable:
+          type: boolean
+          description: False for snapshot-created Templates.
+        deleted_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Logical deletion time in UTC.
+        created_at:
+          type: string
+          format: date-time
+          description: Template creation time in UTC.
+        updated_at:
+          type: string
+          format: date-time
+          description: Template update time in UTC.
+    TemplateBuild:
+      type: object
+      additionalProperties: false
+      required:
+      - id
+      - template_id
+      - trigger
+      - status
+      - artifact_state
+      - source_type
+      - resources
+      - created_at
+      properties:
+        id:
+          type: string
+          description: Immutable Build identifier.
+        template_id:
+          type: string
+          description: Owning Template identifier.
+        trigger:
+          $ref: '#/components/schemas/BuildTrigger'
+        status:
+          $ref: '#/components/schemas/BuildStatus'
+        artifact_state:
+          $ref: '#/components/schemas/ArtifactState'
+        source_type:
+          $ref: '#/components/schemas/BuildSourceType'
+        source:
+          type: object
+          description: Sanitized Build lineage. Internal IDs and credentials are omitted.
+          additionalProperties: true
+        resources:
+          $ref: '#/components/schemas/EffectiveResources'
+        product:
+          type: string
+          nullable: true
+          description: Catalog SKU when created from a preset; null for custom resources.
+        product_name:
+          allOf:
+          - $ref: '#/components/schemas/ResourceSpecName'
+          nullable: true
+          description: Preset label when created from a preset; null for custom resources.
+        commands:
+          type: array
+          description: Build command strings. Empty for snapshot Builds.
+          items:
+            type: string
+        start_cmd:
+          type: string
+          nullable: true
+          description: Persisted launch command for this Build.
+        failure:
+          $ref: '#/components/schemas/BuildFailure'
+        created_at:
+          type: string
+          format: date-time
+          description: Build creation time in UTC.
+        started_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Build start time in UTC.
+        finished_at:
+          type: string
+          format: date-time
+          nullable: true
+          description: Build terminal time in UTC.
+    TemplateBuildResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - request_id
+      - data
+      properties:
+        request_id:
+          type: string
+          description: HTTP request correlation identifier.
+        data:
+          $ref: '#/components/schemas/TemplateBuild'
+    TemplateDeletionAccepted:
+      type: object
+      additionalProperties: false
+      required:
+      - request_id
+      - data
+      properties:
+        request_id:
+          type: string
+          description: Deletion request correlation identifier.
+        data:
+          type: object
+          additionalProperties: false
+          required:
+          - id
+          - deleted
+          properties:
+            id:
+              type: string
+              description: Logically deleted Template identifier.
+            deleted:
+              type: boolean
+              enum:
+              - true
+              description: Confirms that logical deletion is complete.
+    TemplateMutationAccepted:
+      type: object
+      additionalProperties: false
+      required:
+      - request_id
+      - data
+      properties:
+        request_id:
+          type: string
+          description: HTTP request correlation identifier.
+        data:
+          type: object
+          additionalProperties: false
+          required:
+          - id
+          - build_id
+          - status
+          properties:
+            id:
+              type: string
+              description: Created Template identifier.
+            build_id:
+              type: string
+              description: Created initial or snapshot Build identifier.
+            status:
+              $ref: '#/components/schemas/BuildStatus'
+    TemplatePage:
+      type: object
+      additionalProperties: false
+      required:
+      - request_id
+      - total
+      - page
+      - page_size
+      - items
+      properties:
+        request_id:
+          type: string
+          description: HTTP request correlation identifier.
+        total:
+          type: integer
+          format: int64
+          minimum: 0
+          description: Total number of matching Templates.
+        page:
+          type: integer
+          minimum: 1
+          description: One-based page number.
+        page_size:
+          type: integer
+          minimum: 1
+          maximum: 100
+          description: Requested number of Templates per page.
+        items:
+          type: array
+          items:
+            $ref: '#/components/schemas/Template'
+    TemplateResponse:
+      type: object
+      additionalProperties: false
+      required:
+      - request_id
+      - data
+      properties:
+        request_id:
+          type: string
+          description: HTTP request correlation identifier.
+        data:
+          $ref: '#/components/schemas/Template'
+    TemplateSource:
+      type: object
+      additionalProperties: false
+      required:
+      - type
+      - template_id
+      properties:
+        type:
+          type: string
+          enum:
+          - template
+        template_id:
+          type: string
+          description: Parent Template identifier in the same IDC.
+        build_id:
+          type: string
+          description: 'Optional parent Build identifier. When omitted, the parent''s
+
+            current successful Build is used.
+
+            '
+    UpdateSandboxControlRequest:
+      type: object
+      required:
+      - metadata
+      properties:
+        metadata:
+          type: object
+          additionalProperties:
+            type: string
+          description: Customer metadata, replaced as a whole.
+    UpdateTemplateRequest:
+      type: object
+      additionalProperties: false
+      minProperties: 1
+      description: 'Mutable Template metadata patch. Omitted fields are left unchanged;
+
+        `labels` replaces the stored map wholesale when provided.
+
+        '
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 64
+          pattern: ^[A-Za-z0-9_-]+$
+          description: New organization-scoped display name.
+        description:
+          type: string
+          maxLength: 256
+          description: New human-readable description.
+        labels:
+          type: object
+          maxProperties: 64
+          description: Complete replacement of user-defined labels.
+          additionalProperties:
+            type: string
+            maxLength: 256
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      description: 'API Key or Access Token, always sent as `Authorization: Bearer <token>`. The gateway
+        recognizes the token type automatically.
+
+        '
+    sandboxAccessToken:
+      type: apiKey
+      in: header
+      name: X-Access-Token
+      description: 'Sandbox data-plane token — the `sandbox_access_token` returned by the create/connect
+        endpoints. Used for `/files`, Sandbox-Exec, and other data-plane endpoints; the control plane
+        (`/api/v2`) does not accept it, and conversely the control plane''s `Authorization: Bearer` is
+        invalid on the data plane.
+
+
+        The token is bound to its sandbox: using sandbox A''s token against sandbox B''s host fails. It
+        stays valid until the sandbox''s lifetime ends; there is no separate rotation endpoint (`rotate_traffic_token`
+        rotates the port traffic token `traffic_access_token` and does not affect this one).
+
+        '

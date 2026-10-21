@@ -1,0 +1,171 @@
+openapi: 3.0.3
+info:
+  title: IDC Service API
+  description: APIs for IDC Service.
+  version: 2.4.0
+servers:
+  - url: https://console.gmicloud.ai/api/v1
+    description: IDC Service API
+paths:
+  /idcs:
+    get:
+      summary: List all IDCs
+      description: Retrieves a list of IDC information that are not marked as hidden.
+      operationId: listIDCs
+      tags:
+        - idcs
+      responses:
+        '200':
+          description: Successfully retrieved the list of IDCs.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/listIDCsResponse'
+        '500':
+          description: |
+            - [group:**idc**, code:**1201**]: Get IDC list encountered DB error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Get IDC list encountered DB error:
+                  summary: Get IDC list encountered DB error.
+                  value:
+                    group: idc
+                    code: 1201
+                    message: Get IDC list encountered DB error.
+                    traces: ["DB error occurred."]
+components:
+  schemas:
+    listIDCsResponse:
+      type: object
+      x-go-name: listIDCsResponse
+      properties:
+        idcs:
+          type: array
+          description: A list of IDCs.
+          items:
+            $ref: "#/components/schemas/idcInfo"
+      required:
+        - idcs
+    idcInfo:
+      type: object
+      description: Information about the IDC.
+      properties:
+        idcId:
+          type: string
+          description: The unique identifier for the IDC
+          example: us-denver-1
+        name:
+          type: string
+          description: The IDC name.
+          example: Denver IDC-1
+        country:
+          type: string
+          description: The country where the IDC is located, represented by the ISO 3166-1 alpha-2 country code.
+          example: US
+        countrySubdivision:
+          type: string
+          description: The subdivision of the country where the IDC is located, represented by the ISO 3166-2 code.
+          example: US-CO
+        status:
+          type: string
+          description: The IDC status.
+          # oapi-codegen issue: x-go-type extension and ref don't work together
+          # https://github.com/oapi-codegen/oapi-codegen/issues/863
+          enum:
+            - available
+            - full
+            - maintenance
+          x-go-type: ceCommonLibTypes.IdsIDCStatus
+          x-go-type-import:
+            path: us-central1-go.pkg.dev/gmi-cloud-cicd/go-dev/ce-common-lib-go/pkg/types
+            name: ceCommonLibTypes
+          example: available
+      required:
+        - idcId
+        - name
+        - country
+        - countrySubdivision
+        - status
+# =====================
+# START OF ce-common-lib-go substatus MODELS
+# =====================
+# These models are sourced from the ce-common-lib-go.
+# For modifications:
+# 1. Update the original source at:
+#    https://gitlab.com/product-center/cluster-engine/ce-common-lib-go/-/blob/main/pkg/substatus/codegen/api.yaml
+# 2. Use oapi-codegen to generate the updated models.
+# 3. Copy the updated models api.yaml back to this file.
+# =====================
+    ErrStatusMsg:
+      type: object
+      properties:
+        group:
+          type: string
+          description: API function group\n -Will be "request" if there are invalid request parameters.
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+        code:
+          type: integer
+          description: The substatus error code for the API response.
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+        message:
+          type: string
+          description: The substatus error Message for API response.
+          x-go-type-skip-optional-pointer: true
+        traces:
+          type: array
+          items:
+            type: string
+          description: The original error messages.
+          x-go-type-skip-optional-pointer: true
+        validationDetail:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationDetail'
+          description: Returned when there are invalid request paremeters(group="request")\n List of invalid fields and the reason of error.
+          x-go-type-skip-optional-pointer: true
+      example:
+        group: request
+        code: 0
+        validationDetail:
+          - field: email
+            expression: required
+            originalValue: ''
+            reason: 'This field is required.'
+      required:
+        - group
+        - code
+    ValidationDetail:
+      type: object
+      properties:
+        field:
+          type: string
+          description: The field of the request data.
+          x-go-type-skip-optional-pointer: true
+        expression:
+          type: string
+          description: The form of violation.
+          x-go-type-skip-optional-pointer: true
+        argument:
+          type: string
+          description: The number or data to support the expression.
+          x-go-type-skip-optional-pointer: true
+        originalValue:
+          description: The original value from the request.
+          x-go-type-skip-optional-pointer: true
+        reason:
+          type: string
+          description: The reason for the validation error.
+          x-go-type-skip-optional-pointer: true
+      example:
+      - field: fieldXXX
+        expression: required
+        originalValue: ""
+        reason: "This field is required."
+# =====================
+# END OF ce-common-lib-go substatus MODELS
+# =====================

@@ -1,0 +1,2144 @@
+openapi: 3.0.1
+info:
+  contact:
+    email: support@gmicloud.ai
+  description: Cluster Engine API spec
+  title: Cluster Engine API
+  version: 2.4.0
+servers:
+  - url: https://console.gmicloud.ai/api
+tags:
+  - name: containers
+    description: GMI Container management APIs for creating, managing, and monitoring containerized applications.
+  - name: templates
+    description: GMI template management APIs for creating and managing reusable container template.
+  - name: baremetals
+    description: GMI Bare metal management APIs for provisioning, configuring, and controlling physical server nodes. Handles server lifecycle management, hardware inventory, and status monitoring.
+  - name: images
+    description: GMI Image management APIs for query OS images.
+  - name: elastic-ips
+    description: GMI Elastic IP address management APIs for allocating, associating, and managing public IP addresses.
+security:
+  - bearerAuth: []
+paths:
+  /v1/baremetals:
+    get:
+      operationId: listBaremetals
+      parameters:
+        - in: query
+          name: idc
+          schema:
+            $ref: '#/components/schemas/idcName'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/BaremetalResp'
+                type: array
+          description: successful
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: List all baremetal servers
+      tags:
+        - baremetals
+    post:
+      operationId: createBaremetals
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BaremetalReq'
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/UuidObject'
+                type: array
+          description: successful
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Create baremetal servers
+      tags:
+        - baremetals
+  /v1/baremetals/{id}:
+    delete:
+      operationId: deleteBaremetal
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        "200":
+          $ref: '#/components/responses/Done'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Delete baremetal server
+      tags:
+        - baremetals
+    get:
+      operationId: getBaremetal
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BaremetalResp'
+          description: successful
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Get baremetal server by ID
+      tags:
+        - baremetals
+    put:
+      operationId: updateBaremetal
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                name:
+                  type: string
+              required:
+                - name
+              type: object
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BaremetalResp'
+          description: successful
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Update baremetal server
+      tags:
+        - baremetals
+  /v1/baremetals/{id}/actions:
+    post:
+      operationId: executeBaremetalAction
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                type:
+                  enum:
+                    - start
+                    - stop
+                    - powercycle
+                    - reboot
+                  type: string
+              required:
+                - type
+              type: object
+      responses:
+        "200":
+          $ref: '#/components/responses/Done'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Execute baremetal server action
+      tags:
+        - baremetals
+  /v1/baremetals/products:
+    get:
+      operationId: getBaremetalProducts
+      parameters:
+        - in: query
+          name: idc
+          schema:
+            $ref: '#/components/schemas/idcName'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/product'
+                type: array
+          description: successful
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Get baremetal products
+      tags:
+        - baremetals
+  /v1/containers:
+    get:
+      operationId: getContainers
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/containersResp'
+                type: array
+          description: successful
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: List container information
+      tags:
+        - containers
+    post:
+      description: create Container under default namespace
+      operationId: createContainer
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/containerReq'
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/UuidObject'
+                type: array
+          description: successful
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Create containers
+      tags:
+        - containers
+  /v1/containers/{id}:
+    delete:
+      operationId: deleteContainers
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        "200":
+          $ref: '#/components/responses/Done'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Delete container
+      tags:
+        - containers
+    get:
+      operationId: getContainer
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/containersResp'
+          description: successful
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Get container info by ID
+      tags:
+        - containers
+    put:
+      operationId: UpdateContainer
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/containerConfig'
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                properties:
+                  id:
+                    format: uuid
+                    type: string
+                type: object
+          description: successful
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "409":
+          $ref: '#/components/responses/Conflict'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Update container
+      tags:
+        - containers
+  /v1/containers/{id}/logs:
+    get:
+      operationId: downloadLog
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        "200":
+          content:
+            text/plain:
+              schema:
+                type: string
+          description: log string
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Download container logs
+      tags:
+        - containers
+        - logs
+  /v1/containers/{id}/restart:
+    post:
+      operationId: restartContainer
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        "200":
+          $ref: '#/components/responses/Done'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Restart container
+      tags:
+        - containers
+  /v1/containers/{id}/shell:
+    post:
+      operationId: containerShell
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                properties:
+                  urlPath:
+                    format: uri-reference
+                    type: string
+                required:
+                  - urlPath
+                type: object
+          description: successful
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Generate container shell URL path
+      tags:
+        - containers
+  /v1/containers/products:
+    get:
+      operationId: getContainerProducts
+      parameters:
+        - in: query
+          name: idc
+          schema:
+            $ref: '#/components/schemas/idcName'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/product'
+                type: array
+          description: successful
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Get container products
+      tags:
+        - containers
+  /v1/elastic-ips:
+    get:
+      operationId: listElasticIP
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/elasticIPResp'
+                type: array
+          description: successful
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Get elastic IP
+      tags:
+        - elastic-ips
+    post:
+      operationId: allocateElasticIP
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/elasticIPAllocateReq'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/UuidObject'
+                type: array
+          description: successful
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Allocate elastic IP for organization
+      tags:
+        - elastic-ips
+  /v1/elastic-ips/{id}:
+    delete:
+      operationId: releaseElasticIP
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        "200":
+          $ref: '#/components/responses/Done'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "409":
+          $ref: '#/components/responses/Conflict'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Release elastic IP
+      tags:
+        - elastic-ips
+    get:
+      operationId: getElasticIP
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/elasticIPResp'
+          description: successful
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Get elastic IP
+      tags:
+        - elastic-ips
+  /v1/elastic-ips/{id}/associate:
+    post:
+      operationId: associateElasticIP
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/elasticIPAssociateConfig'
+      responses:
+        "200":
+          $ref: '#/components/responses/Done'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "409":
+          $ref: '#/components/responses/Conflict'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Associate elastic IP with instance
+      tags:
+        - elastic-ips
+  /v1/elastic-ips/{id}/disassociate:
+    post:
+      operationId: disassociateElasticIP
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        "200":
+          $ref: '#/components/responses/Done'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "409":
+          $ref: '#/components/responses/Conflict'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Disassociate elastic IP from instance
+      tags:
+        - elastic-ips
+  /v1/elastic-ips/products:
+    get:
+      operationId: getElasticIPProducts
+      parameters:
+        - in: query
+          name: idc
+          schema:
+            $ref: '#/components/schemas/idcName'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/product'
+                type: array
+          description: successful
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Get elastic IP products
+      tags:
+        - elastic-ips
+  /v1/firewalls:
+    get:
+      operationId: listFirewalls
+      parameters:
+        - in: query
+          name: idc
+          schema:
+            $ref: '#/components/schemas/idcName'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/FirewallResp'
+                type: array
+          description: successful
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: List firewalls
+      tags:
+        - firewalls
+    post:
+      operationId: createFirewall
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FirewallCreateReq'
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallResp'
+          description: successful
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Create firewall
+      tags:
+        - firewalls
+  /v1/firewalls/{id}:
+    delete:
+      operationId: deleteFirewall
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        "200":
+          $ref: '#/components/responses/Done'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Delete firewall
+      tags:
+        - firewalls
+    get:
+      operationId: getFirewall
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallResp'
+          description: successful
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Get firewall information by ID
+      tags:
+        - firewalls
+    put:
+      operationId: updateFirewall
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FirewallUpdateReq'
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FirewallResp'
+          description: successful
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Update firewall
+      tags:
+        - firewalls
+  /v1/firewalls/{id}/associate:
+    post:
+      operationId: associateFirewall
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                instances:
+                  $ref: '#/components/schemas/UuidList'
+                instanceType:
+                  default: baremetal
+                  enum:
+                    - baremetal
+                    - container
+                  type: string
+              required:
+                - instances
+              type: object
+        required: true
+      responses:
+        "200":
+          $ref: '#/components/responses/Done'
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Associate firewall
+      tags:
+        - firewalls
+  /v1/firewalls/{id}/disassociate:
+    post:
+      operationId: disassociateFirewall
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                instances:
+                  $ref: '#/components/schemas/UuidList'
+                instanceType:
+                  default: baremetal
+                  enum:
+                    - baremetal
+                    - container
+                  type: string
+              required:
+                - instances
+              type: object
+        required: true
+      responses:
+        "200":
+          $ref: '#/components/responses/Done'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Disassociate firewall
+      tags:
+        - firewalls
+  /v1/images:
+    get:
+      operationId: listImages
+      parameters:
+        - in: query
+          name: idc
+          schema:
+            $ref: '#/components/schemas/idcName'
+        - in: query
+          name: product
+          schema:
+            $ref: '#/components/schemas/productName'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/ImageResp'
+                type: array
+          description: successful
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: List images
+      tags:
+        - images
+  /v1/images/{id}:
+    get:
+      operationId: getImage
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ImageResp'
+          description: successful
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Get image by ID
+      tags:
+        - images
+  /v1/templates:
+    get:
+      operationId: getTemplates
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/templateResp'
+                type: array
+          description: successful
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Get templates list
+      tags:
+        - templates
+    post:
+      description: create template
+      operationId: createTemplates
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/template'
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                properties:
+                  id:
+                    format: uuid
+                    type: string
+                type: object
+          description: successful
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "403":
+          $ref: '#/components/responses/Forbidden'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Create template
+      tags:
+        - templates
+  /v1/templates/{id}:
+    delete:
+      operationId: deleteTemplate
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        "200":
+          $ref: '#/components/responses/Done'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Delete template
+      tags:
+        - templates
+    get:
+      operationId: getTemplate
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/templateResp'
+          description: successful
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Get template
+      tags:
+        - templates
+    put:
+      operationId: UpdateTemplates
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      requestBody:
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/template'
+        required: true
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                properties:
+                  modified:
+                    type: string
+                type: object
+          description: successful
+        "400":
+          $ref: '#/components/responses/BadRequest'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "409":
+          $ref: '#/components/responses/Conflict'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Update template
+      tags:
+        - templates
+  /v1/vpcs:
+    get:
+      operationId: listVpcs
+      parameters:
+        - in: query
+          name: idc
+          schema:
+            $ref: '#/components/schemas/idcName'
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                items:
+                  $ref: '#/components/schemas/vpc'
+                type: array
+          description: successful
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: List all VPCs
+      tags:
+        - vpcs
+    post:
+      operationId: allocateDefaultVpc
+      requestBody:
+        content:
+          application/json:
+            schema:
+              properties:
+                idc:
+                  $ref: '#/components/schemas/idcName'
+              required:
+                - idc
+              type: object
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/vpc'
+          description: successful
+      summary: Allocate default VPC for organization in IDC
+      tags:
+        - vpcs
+  /v1/vpcs/{id}:
+    delete:
+      operationId: releaseDefaultVpc
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        "200":
+          $ref: '#/components/responses/Done'
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Release default VPC
+      tags:
+        - vpcs
+    get:
+      operationId: getVpc
+      parameters:
+        - in: path
+          name: id
+          required: true
+          schema:
+            format: uuid
+            type: string
+      responses:
+        "200":
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/vpc'
+          description: successful
+        "401":
+          $ref: '#/components/responses/Unauthorized'
+        "404":
+          $ref: '#/components/responses/NotFound'
+        "500":
+          $ref: '#/components/responses/InternalServerError'
+        "503":
+          $ref: '#/components/responses/ServiceUnavailable'
+      summary: Get VPC
+      tags:
+        - vpcs
+components:
+  responses:
+    BadRequest:
+      content:
+        application/json:
+          example:
+            reason: resources.CPU is a required property
+          schema:
+            oneOf:
+              - $ref: '#/components/schemas/error'
+              - $ref: '#/components/schemas/errorStatusMessage'
+      description: bad request
+    Conflict:
+      content:
+        application/json:
+          example:
+            reason: timestamp mismatched
+          schema:
+            $ref: '#/components/schemas/error'
+      description: request failed due to a conflict create or update
+    Done:
+      content:
+        application/json:
+          example:
+            result: container 12345678-1234-2234-3234-xxxxxxxxxxxxxx has been restarted
+          schema:
+            properties:
+              result:
+                type: string
+            required:
+              - result
+            type: object
+      description: An action completed successfully
+    Forbidden:
+      content:
+        application/json:
+          example:
+            reason: 'access denied: tenant has no permission to do the operation'
+          schema:
+            $ref: '#/components/schemas/error'
+      description: tenant has no permission to do the operation
+    InternalServerError:
+      content:
+        application/json:
+          example:
+            reason: An error occurred in the kubernetes cluster
+          schema:
+            $ref: '#/components/schemas/error'
+      description: Internal Server Error
+    NotFound:
+      content:
+        application/json:
+          example:
+            reason: resource 12345678-1234-2234-3234-xxxxxxxxxxxxxx was not found
+          schema:
+            $ref: '#/components/schemas/error'
+      description: The specified resource was not found
+    ServiceUnavailable:
+      content:
+        application/json:
+          example:
+            reason: database is unavailable
+          schema:
+            $ref: '#/components/schemas/error'
+      description: a dependent service is unavailable
+    Unauthorized:
+      content:
+        application/json:
+          examples:
+            Expired access token.:
+              summary: Expired access token.
+              value:
+                code: 1
+                group: auth_verify
+                message: Expired access token.
+            Invalid access token.:
+              summary: Invalid access token.
+              value:
+                code: 0
+                group: auth_verify
+                message: Invalid access token.
+          schema:
+            $ref: '#/components/schemas/errorStatusMessage'
+      description: Authentication information is missing or invalid
+      headers:
+        WWW_Authenticate:
+          schema:
+            type: string
+  schemas:
+    BaremetalNetworkAddr:
+      properties:
+        ip:
+          type: string
+        type:
+          enum:
+            - internal
+            - external
+          type: string
+      type: object
+    BaremetalReq:
+      properties:
+        count:
+          minimum: 1
+          type: integer
+        enableZabbixAgent:
+          default: true
+          description: Whether to enable Zabbix agent on the baremetal node
+          type: boolean
+        idc:
+          $ref: '#/components/schemas/idcName'
+        imageId:
+          description: The ID of the image to use for creating the baremetal instance
+          format: uuid
+          type: string
+        internalIp:
+          description: Manually allocate internal IP address(IPv4 only). If not provided, internal IP will be allocated automatically. It only supports single baremetal creation.
+          maxLength: 15
+          minLength: 7
+          type: string
+        name:
+          $ref: '#/components/schemas/name'
+        product:
+          $ref: '#/components/schemas/productName'
+        sshKey:
+          minLength: 1
+          type: string
+        sshKeyIdList:
+          $ref: '#/components/schemas/UuidList'
+          description: The list of SSH key IDs to use for creating the baremetal instance
+      required:
+        - idc
+        - product
+        - name
+        - count
+        - imageId
+      type: object
+    BaremetalResp:
+      properties:
+        associatedFirewalls:
+          $ref: '#/components/schemas/UuidList'
+        consoleReady:
+          type: boolean
+        createdAt:
+          format: date-time
+          type: string
+        id:
+          format: uuid
+          type: string
+        idc:
+          $ref: '#/components/schemas/idcName'
+        image:
+          type: string
+        imageId:
+          format: uuid
+          type: string
+        name:
+          type: string
+        networks:
+          items:
+            $ref: '#/components/schemas/BaremetalNetworkAddr'
+          type: array
+        orgId:
+          format: uuid
+          type: string
+        product:
+          $ref: '#/components/schemas/productName'
+        reason:
+          description: The reason for the validation error.
+          type: string
+        status:
+          enum:
+            - creating
+            - deleted
+            - deleting
+            - error
+            - powercycling
+            - rebooting
+            - rebuilding
+            - running
+            - starting
+            - stopped
+            - stopping
+            - unknown
+          type: string
+      required:
+        - orgId
+        - idc
+        - id
+        - name
+        - status
+        - networks
+        - image
+        - imageId
+        - product
+        - associatedFirewalls
+        - createdAt
+        - consoleReady
+      type: object
+    Env:
+      properties:
+        name:
+          maxLength: 4096
+          pattern: ^[a-zA-Z_][a-zA-Z0-9_]*$
+          type: string
+        value:
+          default: ""
+          maxLength: 1048576
+          type: string
+      required:
+        - name
+        - value
+    FirewallCreateReq:
+      allOf:
+        - $ref: '#/components/schemas/FirewallUpdateReq'
+        - properties:
+            idc:
+              $ref: '#/components/schemas/idcName'
+          required:
+            - idc
+          type: object
+    FirewallResp:
+      allOf:
+        - $ref: '#/components/schemas/FirewallCreateReq'
+        - properties:
+            assoInstances:
+              $ref: '#/components/schemas/UuidList'
+            assoContainers:
+              $ref: '#/components/schemas/UuidList'
+              description: Associated container instance IDs
+            id:
+              format: uuid
+              type: string
+            isPreset:
+              description: Whether this is a preset firewall (cannot be deleted or have rules modified)
+              type: boolean
+            orgId:
+              format: uuid
+              type: string
+            status:
+              enum:
+                - active
+                - building
+                - error
+              type: string
+          type: object
+    FirewallRuleWithPortRange:
+      properties:
+        description:
+          maxLength: 255
+          type: string
+        portRange:
+          $ref: '#/components/schemas/portRange'
+        protocol:
+          enum:
+            - tcp
+            - udp
+          type: string
+        remoteIpPrefix:
+          $ref: '#/components/schemas/remoteIpPrefix'
+      required:
+        - protocol
+        - portRange
+        - remoteIpPrefix
+      type: object
+    FirewallRuleWithoutPortRange:
+      additionalProperties: false
+      properties:
+        description:
+          maxLength: 255
+          type: string
+        protocol:
+          enum:
+            - icmp
+            - any
+          type: string
+        remoteIpPrefix:
+          $ref: '#/components/schemas/remoteIpPrefix'
+      required:
+        - protocol
+        - remoteIpPrefix
+      type: object
+    FirewallRules:
+      items:
+        oneOf:
+          - $ref: '#/components/schemas/FirewallRuleWithPortRange'
+          - $ref: '#/components/schemas/FirewallRuleWithoutPortRange'
+      type: array
+    FirewallUpdateReq:
+      properties:
+        description:
+          maxLength: 255
+          type: string
+        inboundRules:
+          $ref: '#/components/schemas/FirewallRules'
+        name:
+          maxLength: 255
+          type: string
+      required:
+        - name
+        - inboundRules
+      type: object
+    ImageBootMode:
+      enum:
+        - UEFI
+        - Legacy
+      type: string
+    ImageConfig:
+      properties:
+        supportedProducts:
+          items:
+            $ref: '#/components/schemas/productName'
+          type: array
+          x-go-type: pq.StringArray
+          x-go-type-import:
+            path: github.com/lib/pq
+      required:
+        - supportedProducts
+      type: object
+    ImageCreateReq:
+      allOf:
+        - $ref: '#/components/schemas/ImageConfig'
+        - properties:
+            BootMode:
+              $ref: '#/components/schemas/ImageBootMode'
+            DefaultPartitionTable:
+              items:
+                $ref: '#/components/schemas/partition'
+              minItems: 1
+              type: array
+              x-go-type: json.RawMessage
+            OSArchitecture:
+              type: string
+            OSSeries:
+              type: string
+            OSVersion:
+              type: string
+            SystemDiskSize:
+              type: string
+            icon:
+              format: uri
+              type: string
+            idc:
+              $ref: '#/components/schemas/idcName'
+            name:
+              $ref: '#/components/schemas/name'
+            orgId:
+              format: uuid
+              type: string
+            path:
+              type: string
+          required:
+            - idc
+            - orgId
+            - path
+            - name
+            - OSSeries
+            - OSVersion
+            - OSArchitecture
+            - BootMode
+            - SystemDiskSize
+            - DefaultPartitionTable
+            - icon
+          type: object
+    ImageResp:
+      allOf:
+        - $ref: '#/components/schemas/ImageCreateReq'
+        - properties:
+            createdAt:
+              format: date-time
+              type: string
+            id:
+              format: uuid
+              type: string
+            type:
+              enum:
+                - Public
+                - Customized
+              type: string
+              x-enumNames:
+                - ImageTypePublic
+                - ImageTypeCustomized
+          required:
+            - id
+            - type
+            - createdAt
+          type: object
+    Storage:
+      description: mount persistent file systems in the container pod
+      properties:
+        containerPath:
+          description: Mounting root directory "/" is not allowed
+          example: /tmp
+          maxLength: 4096
+          pattern: ^\/.+$
+          type: string
+        id:
+          format: uuid
+          type: string
+      required:
+        - id
+        - containerPath
+    UuidList:
+      items:
+        format: uuid
+        type: string
+      type: array
+    UuidObject:
+      properties:
+        id:
+          format: uuid
+          type: string
+      required:
+        - id
+      type: object
+    container:
+      allOf:
+        - properties:
+            idc:
+              $ref: '#/components/schemas/idcName'
+            product:
+              $ref: '#/components/schemas/productName'
+          required:
+            - product
+            - idc
+          type: object
+        - $ref: '#/components/schemas/containerConfig'
+    containerConfig:
+      properties:
+        args:
+          default: []
+          description: Optional container command arguments
+          items:
+            type: string
+          type: array
+          x-go-type-skip-optional-pointer: true
+        command:
+          default: ""
+          description: Optional container start command
+          type: string
+          x-go-type-skip-optional-pointer: true
+        envs:
+          default: []
+          example:
+            - name: access_token
+              value: kalsk113==
+          items:
+            $ref: '#/components/schemas/Env'
+          minLength: 0
+          type: array
+        name:
+          $ref: '#/components/schemas/name'
+          example: LLM training
+        ports:
+          default: []
+          items:
+            $ref: '#/components/schemas/exposedPort'
+          maxLength: 5
+          minLength: 0
+          type: array
+          x-go-type-skip-optional-pointer: true
+        sshKeyIdList:
+          $ref: '#/components/schemas/UuidList'
+          description: The list of SSH key IDs to use in the container
+        templateId:
+          description: template id
+          format: uuid
+          type: string
+      required:
+        - name
+        - templateId
+      type: object
+    containerReq:
+      allOf:
+        - properties:
+            count:
+              minimum: 1
+              type: integer
+          required:
+            - count
+          type: object
+        - $ref: '#/components/schemas/container'
+    containerStatus:
+      enum:
+        - unknown
+        - creating
+        - running
+        - terminating
+        - stopped
+        - error
+        - zombie
+      type: string
+    containersResp:
+      allOf:
+        - properties:
+            createdAt:
+              format: date-time
+              type: string
+            eipAddress:
+              type: string
+            eipId:
+              format: uuid
+              type: string
+            firewalls:
+              items:
+                format: uuid
+                type: string
+              type: array
+            id:
+              format: uuid
+              type: string
+            inboundIP:
+              $ref: '#/components/schemas/externalIP'
+            modifiedAt:
+              format: date-time
+              type: string
+            orgId:
+              format: uuid
+              type: string
+            outboundIP:
+              $ref: '#/components/schemas/externalIP'
+            publicIP:
+              $ref: '#/components/schemas/externalIP'
+            reason:
+              description: reason of container status
+              type: string
+            status:
+              $ref: '#/components/schemas/containerStatus'
+            storages:
+              default: []
+              example:
+                - containerPath: /workspace
+                  id: 550e8400-e29b-41d4-a716-446655440000
+              items:
+                $ref: '#/components/schemas/Storage'
+              minLength: 0
+              type: array
+          required:
+            - status
+            - reason
+            - storages
+          type: object
+        - $ref: '#/components/schemas/container'
+    credential:
+      default:
+        secret: ""
+        username: ""
+      properties:
+        secret:
+          default: ""
+          format: password
+          maxLength: 4096
+          minLength: 0
+          type: string
+        username:
+          default: ""
+          maxLength: 4096
+          minLength: 0
+          type: string
+      type: object
+    elasticIP:
+      allOf:
+        - $ref: '#/components/schemas/elasticIPConfig'
+        - properties:
+            idc:
+              $ref: '#/components/schemas/idcName'
+            ipAddress:
+              description: IP address of the elastic IP. The longest possible IPv6 address is 39 characters
+              maxLength: 39
+              minLength: 7
+              type: string
+            product:
+              $ref: '#/components/schemas/productName'
+          required:
+            - idc
+            - ipAddress
+            - product
+          type: object
+    elasticIPAllocateReq:
+      properties:
+        count:
+          default: 1
+          minimum: 1
+          type: integer
+        idc:
+          $ref: '#/components/schemas/idcName'
+        name:
+          $ref: '#/components/schemas/name'
+          description: Name of the elastic IP
+        product:
+          $ref: '#/components/schemas/productName'
+      required:
+        - idc
+        - count
+        - name
+        - product
+      type: object
+    elasticIPAssociateConfig:
+      properties:
+        instanceID:
+          description: set instanceID and instanceType to associate the elastic IP to the instance, set to null to disassociate the elastic IP from the instance
+          format: uuid
+          nullable: true
+          type: string
+        instanceType:
+          $ref: '#/components/schemas/instanceType'
+      type: object
+    elasticIPConfig:
+      properties:
+        internetConnectionType:
+          default: Dual-Homed
+          enum:
+            - BGP
+            - Dual-Homed
+          type: string
+        maxBandwidth:
+          default: 100 Gbps
+          maxLength: 1048576
+          minLength: 1
+          type: string
+        name:
+          $ref: '#/components/schemas/name'
+          description: Name of the elastic IP
+      required:
+        - name
+        - internetConnectionType
+        - maxBandwidth
+      type: object
+    elasticIPResp:
+      allOf:
+        - properties:
+            id:
+              format: uuid
+              type: string
+            orgId:
+              description: if nil, it means the elastic IP is not associated with any instance
+              format: uuid
+              type: string
+            status:
+              enum:
+                - released
+                - associated
+                - disassociated
+              type: string
+          required:
+            - orgId
+            - id
+            - status
+          type: object
+        - $ref: '#/components/schemas/elasticIP'
+        - $ref: '#/components/schemas/elasticIPAssociateConfig'
+      type: object
+    error:
+      properties:
+        code:
+          type: integer
+          x-go-type-skip-optional-pointer: true
+        reason:
+          type: string
+          x-go-type-skip-optional-pointer: true
+      required:
+        - reason
+      type: object
+    errorStatusMessage:
+      example:
+        code: 0
+        group: request
+        validationDetail:
+          - expression: required
+            field: userName
+            originalValue: ""
+            reason: This field is required.
+      properties:
+        code:
+          description: The substatus error code for the API response.
+          type: integer
+        group:
+          description: API function group. Will be "request" if there are invalid request parameters.
+          type: string
+        message:
+          description: The substatus error message for the API response.
+          type: string
+        traces:
+          description: The original error messages.
+          items:
+            type: string
+          type: array
+        validationDetail:
+          items:
+            $ref: '#/components/schemas/validationDetail'
+          type: array
+      required:
+        - group
+        - code
+      type: object
+    exposedPort:
+      properties:
+        containerPort:
+          maximum: 65534
+          minimum: 0
+          type: integer
+        port:
+          maximum: 65534
+          minimum: 0
+          type: integer
+          x-go-type-skip-optional-pointer: true
+        protocol:
+          enum:
+            - TCP
+            - UDP
+          type: string
+      required:
+        - containerPort
+        - protocol
+    externalIP:
+      properties:
+        ipAddress:
+          type: string
+        status:
+          enum:
+            - ready
+            - pending
+            - error
+            - not_applicable
+          type: string
+      required:
+        - ipAddress
+        - status
+      x-go-type-skip-optional-pointer: true
+    idcName:
+      maxLength: 50
+      pattern: ^[a-zA-Z0-9._-]+$
+      type: string
+    instanceType:
+      enum:
+        - baremetal
+        - container
+      nullable: true
+      type: string
+    name:
+      maxLength: 255
+      pattern: ^([A-Za-z0-9][A-Za-z0-9_\-. ]*)?[A-Za-z0-9]$
+      type: string
+    partition:
+      properties:
+        fileSystem:
+          maxLength: 256
+          minLength: 1
+          type: string
+        mountPoint:
+          maxLength: 1024
+          minLength: 1
+          type: string
+        name:
+          $ref: '#/components/schemas/name'
+        size:
+          maxLength: 256
+          minLength: 1
+          type: string
+      required:
+        - name
+        - mountPoint
+        - size
+        - fileSystem
+      type: object
+    portRange:
+      properties:
+        max:
+          maximum: 65535
+          minimum: 1
+          type: integer
+        min:
+          maximum: 65535
+          minimum: 1
+          type: integer
+      required:
+        - min
+        - max
+      type: object
+    product:
+      properties:
+        gpuModel:
+          type: string
+        idc:
+          type: string
+        name:
+          type: string
+        price:
+          type: integer
+        productLine:
+          description: product line for categorization
+          type: string
+        spec:
+          type: object
+        type:
+          $ref: '#/components/schemas/productType'
+        valid:
+          type: boolean
+      required:
+        - idc
+        - name
+        - type
+        - price
+        - valid
+        - spec
+      type: object
+    productName:
+      maxLength: 256
+      pattern: ^[a-zA-Z0-9._-]+$
+      type: string
+    productType:
+      enum:
+        - Container
+        - BareMetal
+        - Storage
+        - EIP
+      type: string
+    remoteIpPrefix:
+      description: CIDR notation
+      example: 237.84.2.178/24
+      pattern: ^[0-9]{1,3}(\.[0-9]{1,3}){3}\/[0-9]{1,2}$
+      type: string
+    template:
+      properties:
+        credential:
+          $ref: '#/components/schemas/credential'
+        description:
+          default: ""
+          maxLength: 4096
+          minLength: 0
+          type: string
+        name:
+          $ref: '#/components/schemas/name'
+        path:
+          format: uri
+          maxLength: 253
+          pattern: ^\S+$
+          type: string
+        status:
+          default: published
+          enum:
+            - draft
+            - published
+            - unpublished
+          type: string
+      required:
+        - name
+        - path
+      type: object
+    templateResp:
+      allOf:
+        - properties:
+            id:
+              format: uuid
+              type: string
+            official:
+              description: true means the template is provided by GMI Cloud and it's read only.
+              type: boolean
+            orgId:
+              format: uuid
+              type: string
+          type: object
+        - $ref: '#/components/schemas/template'
+      required:
+        - id
+        - official
+    validationDetail:
+      example:
+        expression: required
+        field: userName
+        originalValue: ""
+        reason: This field is required.
+      properties:
+        argument:
+          description: Data supporting the expression.
+          type: string
+        expression:
+          description: The form of violation.
+          type: string
+        field:
+          description: The field of the request data.
+          type: string
+        originalValue:
+          description: The original value from the request.
+          type: string
+        reason:
+          description: The reason for the validation error.
+          type: string
+      type: object
+    vpc:
+      properties:
+        createdAt:
+          format: date-time
+          type: string
+        id:
+          format: uuid
+          type: string
+        idc:
+          type: string
+        name:
+          type: string
+        orgId:
+          format: uuid
+          type: string
+        subnets:
+          items:
+            $ref: '#/components/schemas/vpcSubnet'
+          type: array
+      required:
+        - id
+        - idc
+        - orgId
+        - name
+        - createdAt
+        - subnets
+      type: object
+    vpcSubnet:
+      properties:
+        cidr:
+          type: string
+        id:
+          format: uuid
+          type: string
+        name:
+          type: string
+      required:
+        - id
+        - name
+        - cidr
+      type: object
+  securitySchemes:
+    bearerAuth:
+      bearerFormat: JWT
+      scheme: bearer
+      type: http

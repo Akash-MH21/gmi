@@ -1,0 +1,3347 @@
+openapi: 3.0.3
+info:
+  title: IAM Service API
+  description: APIs for IAM Service.
+  version: 2.4.0
+servers:
+  - url: https://console.gmicloud.ai/api/v1
+    description: IAM Service API
+paths:
+  /users/password-reset:
+    post:
+      summary: Request password reset
+      description: Sends a password reset email to the user.
+      operationId: requestPasswordReset
+      tags:
+        - users
+      requestBody:
+        description: The request body for requesting a password reset.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/passwordResetRequest'
+      responses:
+        '200':
+          description: Successfully sent password reset email.
+        '400':
+          description: |
+            - [group:**request**, code:**0**]: Invalid field in the request.
+            - [group:**request**, code:**1**]: The request body is required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid field in the request:
+                  summary: Invalid field in the request.
+                  value:
+                    group: request
+                    code: 0
+                    validationDetail:
+                      - field: email
+                        expression: required
+                        originalValue: ""
+                        reason: "This field is required."
+        '429':
+          description: |
+            - [group:**user**, code:**200**]: Too many password reset requests.
+          headers:
+            Retry-After:
+              description: The number of seconds the user should wait before retrying.
+              schema:
+                type: integer
+                example: 300
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Too many password reset requests:
+                  summary: Too many password reset requests.
+                  value:
+                    group: user
+                    code: 200
+                    message: Too many password reset requests.
+        '500':
+          description: |
+            - [group:**user**, code:**201**]: Get user password reset data encountered error.
+            - [group:**user**, code:**202**]: Get user password reset data TTL encountered error.
+            - [group:**user**, code:**203**]: Save user password reset data encountered error.
+            - [group:**user**, code:**204**]: Create OTP code encountered error.
+            - [group:**user**, code:**205**]: Create password reset token encountered error.
+            - [group:**user**, code:**1200**]: Get user encountered DB error.
+            - [group:**email**, code:**0**]: Failed to send email.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Get user password reset data encountered error:
+                  summary: Get user password reset data encountered error.
+                  value:
+                    group: user
+                    code: 201
+                    message: Get user password reset data encountered error.
+                    traces: ["error occurred."]
+  /users/email-verification-code:
+    post:
+      summary: Resend email verification code
+      description: Resend email verificaion code.
+      operationId: resendEmailCodeRequest
+      tags:
+        - users
+      security:
+        - bearerEmailVerificationToken: []
+      responses:
+        '201':
+          description: Successfully resent email verfication code.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/resendEmailVerificationCodeResponse'
+        '401':
+          description: |
+            - [group:**user**, code:**406**]: Invalid email verification token.
+            - [group:**user**, code:**407**]: Expired email verification token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid email verification token:
+                  summary: Invalid email verification token.
+                  value:
+                    group: user
+                    code: 406
+                    message: Invalid email verification token.
+        '429':
+          description: |
+            - [group:**user**, code:**400**]: Too many email verification code resend requests.
+          headers:
+            Retry-After:
+              description: The number of seconds the user should wait before retrying.
+              schema:
+                type: integer
+                example: 300
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Too many email verification code resend attempts:
+                  summary: Too many email verification code resend attempts.
+                  value:
+                    group: user
+                    code: 400
+                    message: Too many email verification code resend attempts.
+        '500':
+          description: |
+            - [group:**user**, code:**401**]: Get user email verification data encountered error.
+            - [group:**user**, code:**402**]: Get user email verification data TTL encountered error.
+            - [group:**user**, code:**403**]: Save user email verification data encountered error.
+            - [group:**user**, code:**404**]: Create OTP code encountered error.
+            - [group:**user**, code:**405**]: Create email verification token encountered error.
+            - [group:**email**, code:**0**]: Failed to send email.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Get user email verification data encountered error:
+                  summary: Get user email verification data encountered error.
+                  value:
+                    group: user
+                    code: 401
+                    message: Get user email verification data encountered error.
+                    traces: ["error occurred."]
+  /users/email-verification:
+    post:
+      summary: Verify user's email and complete user registration.
+      description:  |
+        Confirms the user's email address and finalizes the the account creation process.
+
+        Upon successful verification:
+        - If `organization` was provided during signup, the new organization will be created and the user will become its owner.
+        - If `invitationKey` was provided during signup, the user joins the invited organization.
+      operationId: emailVerification
+      tags:
+        - users
+      security:
+        - bearerEmailVerificationToken: []
+      requestBody:
+        description: The request body for email verification
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/emailVerificationRequest'
+      responses:
+        '201':
+          description: User email successfully verified and user account is created.
+          content:
+            application/json:
+              schema: 
+                $ref: '#/components/schemas/emailVerificationResponse'
+        '400':
+          description: |
+            - [group:**request**, code:**0**]: Invalid field in the request body.
+            - [group:**request**, code:**1**]: The request body is required.
+            - [group:**user**, code:**408**]: Invalid otpCode.
+            - [group:**user**, code:**409**]: Expired otpCode.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid field in the request body:
+                  summary: Invalid field in the request body.
+                  value:
+                    group: request
+                    code: 0
+                    validationDetail:
+                      - field: email
+                        expression: required
+                        originalValue: ""
+                        reason: "This field is required."
+        '401':
+          description: |
+            - [group:**user**, code:**406**]: Invalid email verification token.
+            - [group:**user**, code:**407**]: Expired email verification token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid email verification token:
+                  summary: Invalid email verification token.
+                  value:
+                    group: user
+                    code: 406
+                    message: Invalid email verification token.
+        '404':
+          description: |
+            - [group:**organization**, code:**2**]: Organization does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Organization does not exist:
+                  summary: Organization does not exist.
+                  value:
+                    group: organization
+                    code: 2
+                    message: Organization does not exist.
+        '500':
+          description: |
+            - [group:**invitation**, code:**201**]: Get invitation encountered error.
+            - [group:**organization**, code:**1000**]: Create organization encountered DB error.
+            - [group:**organization**, code:**1001**]: Create organization grouping policy encountered error.
+            - [group:**organization**, code:**1201**]: Get organization encountered DB error.
+            - [group:**session**, code:**200**]: Failed to create auth token.
+            - [group:**session**, code:**201**]: Failed to save auth token data.
+            - [group:**user**, code:**401**]: Get user email verification data encountered error.
+            - [group:**user**, code:**403**]: Save user email verification data encountered error.
+            - [group:**user**, code:**1000**]: Create user encountered DB error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Get user email verification data encountered error:
+                  summary: Get user email verification data encountered error.
+                  value:
+                    group: user
+                    code: 401
+                    message: Get user email verification data encountered error.
+                    traces: ["error occurred."]
+  /users/{userId}:
+    delete:
+      summary: Delete a user account.
+      description: |
+        Delete a user account.
+        - A user can delete their own account.
+        - An organization owner cannot be deleted.
+        - An organization owner can delete any user within the same organization.
+      tags:
+        - users
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/userIdParam"
+      responses:
+        '200':
+          description: Successfully deleted the user.
+        '400':
+          description: |
+            - [group:**request**, code:**0**]: Invalid field in the request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid field in the request:
+                  summary: Invalid field in the request.
+                  value:
+                    group: request
+                    code: 0
+                    validationDetail:
+                      - field: userId
+                        expression: uuid
+                        originalValue: "userId"
+                        reason: "Should be a valid UUID."
+        '403':
+          description: |
+            - [group:**organization**, code:**6**]: Organization owner cannot be deleted.
+            - [group:**user**, code:**4**]: The user has no permission to access the resources.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Organization owner cannot be deleted:
+                  summary: Organization owner cannot be deleted.
+                  value:
+                    group: organization
+                    code: 6
+                    message: Organization owner cannot be deleted.
+        '500':
+          description: |
+            - [group:**organization**, code:**1200**]: Get organization grouping policy encountered error.
+            - [group:**session**, code:**5**]: Failed to delete session.
+            - [group:**user**, code:**1600**]: Delete user data encountered DB error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Get organization grouping policy encountered error:
+                  summary: Get organization grouping policy encountered error.
+                  value:
+                    group: organization
+                    code: 1200
+                    message: Get organization grouping policy encountered error.
+                    traces: ["DB error occurred."]
+  /me/auth-tokens:
+    post:
+      summary: Create an auth token.
+      description: Create a short-term authentication token using user credentials for exchanging access and refresh tokens.
+      operationId: createAuthToken
+      tags:
+        - me
+      requestBody:
+        description: The create session request body.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/createAuthTokenRequest'
+      responses:
+        '201':
+          description: Successfully created an auth token for user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/authTokenResponse'
+        '400':
+          description: |
+            - [group:**request**, code:**0**]: Invalid field in the request body.
+            - [group:**request**, code:**1**]: The request body is required.
+            - [group:**session**, code:**0**]: Invalid email or password.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid field in the request body:
+                  summary: Invalid field in the request body.
+                  value:
+                    group: request
+                    code: 0
+                    validationDetail:
+                      - field: email
+                        expression: required
+                        originalValue: ""
+                        reason: "This field is required."
+                No request body:
+                  summary: No request body.
+                  value:
+                    group: request
+                    code: 1
+                    message: The request body is required.
+                Invalid email or password:
+                  summary: Invalid email or password.
+                  value:
+                    group: session
+                    code: 0
+                    message: Invalid email or password.
+        '429':
+          description: |
+            - [group:**rate-limit**, code:**0**]: Rate limit exceeded.
+          headers:
+            Retry-After:
+              description: The number of seconds the user should wait before retrying.
+              schema:
+                type: integer
+                example: 300
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Rate limit exceeded:
+                  summary: Rate limit exceeded.
+                  value:
+                    group: rate-limit
+                    code: 0
+                    message: Rate limit exceeded.
+        '500':
+          description: |
+            - [group:**email**, code:**0**]: Failed to send email.
+            - [group:**rate-limit**, code:**1**]: Failed to get rate limit configuration.
+            - [group:**rate-limit**, code:**2**]: Failed to save rate limit configuration.
+            - [group:**session**, code:**200**]: Failed to create auth token.
+            - [group:**session**, code:**201**]: Failed to save auth token data.
+            - [group:**session**, code:**204**]: Failed to create OTP code.
+            - [group:**session**, code:**207**]: Unsupported OTP code delivery method.
+            - [group:**user**, code:**1200**]: Get user encountered DB error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Failed to create auth token:
+                  summary: Failed to create auth token.
+                  value:
+                    group: session
+                    code: 200
+                    message: Failed to create auth token.
+                    traces: ["error occurred."]
+  /me/oauth/auth-tokens:
+    post:
+      summary: Create an auth token via OAuth.
+      description: Create a short-term authentication token using a third-party OAuth provider (e.g., Google).
+      operationId: createAuthTokenOAuth
+      tags:
+        - me
+      requestBody:
+        description: The request body for creating an auth token via OAuth.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/createOAuthAuthTokenRequest'
+      responses:
+        '201':
+          description: Successfully created an auth token for user via OAuth.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/createOAuthAuthTokenResponse'
+        '400':
+          description: |
+            - [group:**oauth**, code:**0**]: Unsupported OAuth provider.
+            - [group:**oauth**, code:**1**]: Invalid access token.
+            - [group:**request**, code:**0**]: Invalid field in the request body.
+            - [group:**request**, code:**1**]: The request body is required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid field in the request body:
+                  summary: Invalid field in the request body.
+                  value:
+                    group: request
+                    code: 0
+                    validationDetail:
+                      - field: provider
+                        expression: required
+                        originalValue: ""
+                        reason: "This field is required."
+                The request body is required:
+                  summary: The request body is required.
+                  value:
+                    group: request
+                    code: 1
+                    message: The request body is required.
+        '404':
+          description: |
+            - [group:**user**, code:**1**]: User does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                User does not exist:
+                  summary: User does not exist.
+                  value:
+                    group: user
+                    code: 0
+                    message: User does not exist.
+        '500':
+          description: |
+            - [group:**oauth**, code:**1000**]: Get user info encountered error.
+            - [group:**session**, code:**200**]: Failed to create auth token.
+            - [group:**session**, code:**201**]: Failed to save auth token data.
+            - [group:**user**, code:**1200**]: Get user encountered DB error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Failed to create auth token:
+                  summary: Failed to create auth token.
+                  value:
+                    group: session
+                    code: 200
+                    message: Failed to create auth token.
+                    traces: ["error occurred."]
+  /me/2fa-verification-code:
+    post:
+      summary: Resend 2FA verification code.
+      description: Resend 2FA verificaion code.
+      operationId: resend2FACode
+      tags:
+        - me
+      requestBody:
+        description: The request body for resending 2FA code.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/resend2FACodeRequest'
+      responses:
+        '201':
+          description: Successfully sent 2FA verification code.
+        '400':
+          description: |
+            - [group:**request**, code:**0**]: Invalid field in the request body.
+            - [group:**request**, code:**1**]: The request body is required.
+            - [group:**auth**, code:**10**]: Invalid authToken.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid field in the request body:
+                  summary: Invalid field in the request body.
+                  value:
+                    group: request
+                    code: 0
+                    validationDetail:
+                      - field: email
+                        expression: required
+                        originalValue: ""
+                        reason: "This field is required."
+        '403':
+          description: |
+            - [group:**auth**, code:**5**]: The user has no permission to access the resource.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                The user has no permission to access the resource:
+                  summary: The user has no permission to access the resource.
+                  value:
+                    group: auth
+                    code: 5
+                    message: The user has no permission to access the resource.
+        '500':
+          description: |
+            - [group:**session**, code:**202**]: Failed to get auth token data.
+            - [group:**session**, code:**204**]: Failed to create OTP code.
+            - [group:**session**, code:**201**]: Failed to save auth token data.
+            - [group:**session**, code:**207**]: Unsupported OTP code delivery method.
+            - [group:**email**, code:**0**]: Failed to send email.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Failed to get auth token data:
+                  summary: Failed to get auth token data.
+                  value:
+                    group: session
+                    code: 202
+                    message: Failed to get auth token data.
+                    traces: ["error occurred."]
+  /me/sessions:
+    post:
+      summary: Create session
+      description: Create a login session for user.
+      operationId: createSession
+      tags:
+        - me
+      parameters:
+        - $ref: "#/components/parameters/clientIdParam"
+      requestBody:
+        description: The request body for session creation
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/createSessionRequest'
+      responses:
+        '201':
+          description: Successfully created a login session for user.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/sessionResponse'
+        '400':
+          description: |
+            - [group:**request**, code:**0**]: Invalid field in the request body.
+            - [group:**request**, code:**1**]: The request body is required.
+            - [group:**auth**, code:**0**]: Invalid CE-ClientId.
+            - [group:**auth**, code:**10**]: Invalid authToken.
+            - [group:**session**, code:**205**]: Invalid otpCode.
+            - [group:**session**, code:**206**]: Expired otpCode.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid field in the request body:
+                  summary: Invalid field in the request body.
+                  value:
+                    group: request
+                    code: 0
+                    validationDetail:
+                      - field: email
+                        expression: required
+                        originalValue: ""
+                        reason: "This field is required."
+        '500':
+          description: |
+            - [group:**session**, code:**202**]: Failed to get auth token data.
+            - [group:**session**, code:**1**]: Failed to create access token.
+            - [group:**session**, code:**2**]: Failed to create refresh token.
+            - [group:**session**, code:**3**]: Failed to save session.
+            - [group:**session**, code:**201**]: Failed to save auth token data.
+            - [group:**session**, code:**203**]: Failed to delete auth token data.
+            - [group:**organization**, code:**1200**]: Get organization grouping policy encountered error.
+            - [group:**user**, code:**1401**]: Update user data encountered DB error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Failed to create access token:
+                  summary: Failed to create access token.
+                  value:
+                    group: session
+                    code: 1
+                    message: Failed to create access token.
+                    traces: ["error occurred."]
+    patch:
+      summary: Refresh session
+      description: Refresh an existing session, which will return a new access token and refresh token.
+      operationId: refreshSession
+      tags:
+        - me
+      parameters:
+        - $ref: "#/components/parameters/clientIdParam"
+      requestBody:
+        description: The refresh session request body.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/refreshSessionRequest'
+      responses:
+        '200':
+          description: Successfully refreshed an existing session.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/sessionResponse'
+        '400':
+          description: |
+            - [group:**request**, code:**0**]: Invalid field in the request body.
+            - [group:**request**, code:**1**]: The request body is required.
+            - [group:**auth**, code:**0**]: Invalid CE-ClientId.
+            - [group:**auth**, code:**1**]: Invalid refreshToken.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid field in the request body:
+                  summary: Invalid field in the request body.
+                  value:
+                    group: request
+                    code: 0
+                    validationDetail:
+                      - field: email
+                        expression: required
+                        originalValue: ""
+                        reason: "This field is required."
+                No request body:
+                  summary: No request body.
+                  value:
+                    group: request
+                    code: 1
+                    message: The request body is required.
+                Invalid refreshToken:
+                  summary: Invalid refreshToken.
+                  value:
+                    group: auth
+                    code: 1
+                    message: Invalid refreshToken.
+        '500':
+          description: |
+            - [group:**session**, code:**1**]: Failed to create access token.
+            - [group:**session**, code:**2**]: Failed to create refresh token.
+            - [group:**session**, code:**3**]: Failed to save session to cache.
+            - [group:**session**, code:**4**]: Failed to get session.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Failed to create access token:
+                  summary: Failed to create access token.
+                  value:
+                    group: auth
+                    code: 1000
+                    message: Failed to create access token.
+                    traces: ["error occurred."]
+  /me/profile:
+    get:
+      summary: Retrieve user's profile
+      description: Retrieves the profile information of the current authenticated user.
+      operationId: getUserProfile
+      tags:
+        - me
+      security:
+        - bearerAuth: []
+      responses:
+        '200':
+          description: Successfully retrieved the user's profile.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/getUserProfileResponse'
+        '500':
+          description: |
+            - [group:**user**, code:**1200**]: Get user encountered DB error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Get user encountered DB error:
+                  summary: Get user encountered DB error.
+                  value:
+                    group: user
+                    code: 1000
+                    message: Get user encountered DB error.
+                    traces: ["DB error occurred."]
+    patch:
+      summary: Update user's profile
+      description: Update the current authenticated user's profile. Either **firstName** or **lastName** should be provided in the request body.
+      operationId: updateUserProfile
+      tags:
+        - me
+      security:
+        - bearerAuth: []
+      requestBody:
+        description: The profile update request body. Either **firstName** or **lastName** should be provided.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/updateProfileRequest'
+      responses:
+        '200':
+          description: Successfully updated the user's profile.
+        '400':
+          description: |
+            - [group:**request**, code:**1**]: The request body is required.
+            - [group:**request**, code:**0**]: Invalid field in the request body.
+            - [group:**user**, code:**3**]: Either firstName or lastName must be provided in the request body.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Either firstName or lastName must be provided in the request body:
+                  summary: Either firstName or lastName must be provided in the request body.
+                  value:
+                    group: user
+                    code: 3
+                    message: Either firstName or lastName must be provided in the request body.
+        '500':
+          description: |
+            - [group:**user**, code:**1401**]: Update user data encountered DB error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Update user data encountered DB error:
+                  summary: Update user data encountered DB error.
+                  value:
+                    group: user
+                    code: 1401
+                    message: Update user data encountered DB error.
+                    traces: ["DB error occurred."]
+  /me/api-keys/current:
+    get:
+      summary: Verify API Key and retrieve the key details
+      description: Validate the API key from the Authorization Bearer token and return the key details.
+      operationId: verifyApiKey
+      tags:
+        - me
+      security:
+        - bearerAPIKey: []
+      responses:
+        '200':
+          description: Successfully verified the API key and retrieved the key details.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/verifyAPIKeyResponse'
+        '401':
+          description: |
+            - [group:**api-key**, code:**200**]: Invalid API key.
+            - [group:**api-key**, code:**201**]: Expired API key.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid API key:
+                  summary: Invalid API key.
+                  value:
+                    group: api-key
+                    code: 200
+                    message: Invalid API key.
+        '500':
+          description: |
+            - [group:**api-key**, code:**1201**]: Get API key encountered DB error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Get API key encountered DB error:
+                  summary: Get API key encountered DB error.
+                  value:
+                    group: api-key
+                    code: 1201
+                    message: Get API key encountered DB error.
+                    traces: ["DB error occurred."]
+  /me/password:
+    patch:
+      summary: Update user password
+      description: |
+        Allows a user to update their password.
+        - **Authenticated user**: Must use `Bearer <access token>` in Authorization header and provide `currentPassword` in the request body.
+        - **Password reset user**: Must provide `passwordResetToken` and provide `otpCode` in the request body.
+      operationId: updateUserPassword
+      tags:
+        - me
+      security:
+        - {}  # Allow requests without the Authorization header.
+        - bearerAuth: []
+      requestBody:
+        description: The request body for updating user password
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/updatePasswordRequest'
+      responses:
+        '200':
+          description: Successfully updated user password.
+        '400':
+          description: |
+            - [group:**request**, code:**0**]: Invalid field in the request.
+            - [group:**request**, code:**1**]: The request body is required.
+            - [group:**user**, code:**208**]: Invalid otpCode.
+            - [group:**user**, code:**209**]: Expired otpCode.
+            - [group:**user**, code:**211**]: Either `Authorization` in header or `passwordResetToken` in request body must be provided.
+            - [group:**user**, code:**212**]: Invalid currentPassword.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid field in the request:
+                  summary: Invalid field in the request.
+                  value:
+                    group: request
+                    code: 0
+                    validationDetail:
+                      - field: newPassword
+                        expression: required
+                        originalValue: ""
+                        reason: "This field is required."
+        '401':
+          description: |
+            - [group:**user**, code:**206**]: Invalid reset password token.
+            - [group:**user**, code:**207**]: Expired reset password token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid reset password token:
+                  summary: Invalid reset password token.
+                  value:
+                    group: user
+                    code: 11
+                    message: Invalid reset password token.
+        '500':
+          description: |
+            - [group:**user**, code:**1**]: User does not exist.
+            - [group:**user**, code:**201**]: Get user password reset data encountered error.
+            - [group:**user**, code:**210**]: Delete user password reset data encountered error.
+            - [group:**user**, code:**1200**]: Get user encountered DB error.
+            - [group:**user**, code:**1400**]: Update user passsword encountered DB error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Get user password reset data encountered error:
+                  summary: Get user password reset data encountered error.
+                  value:
+                    group: user
+                    code: 201
+                    message: Get user password reset data encountered error.
+                    traces: ["error occurred."]
+  /me/ssh-keys:
+    post:
+      summary: Create an SSH key
+      description: Create an SSH public key for the current authenticated user.
+      operationId: createSSHKey
+      tags:
+        - me
+      security:
+        - bearerAuth: []
+      requestBody:
+        description: The request body for SSH key creation.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/createSSHKeyRequest'
+      responses:
+        '201':
+          description: Successfully created an SSH key.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/createSSHKeyResponse'
+        '400':
+          description: |
+            - [group:**request**, code:**0**]: Invalid field in the request.
+            - [group:**request**, code:**1**]: The request body is required.
+            - [group:**ssh-key**, code:**0**]: Invalid SSH key.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid field in the request:
+                  summary: Invalid field in the request.
+                  value:
+                    group: request
+                    code: 0
+                    validationDetail:
+                      - field: sshKey
+                        expression: required
+                        originalValue: ""
+                        reason: "This field is required."
+        '403':
+          description: |
+            - [group:**ssh-key**, code:**500**]: The maximum number of SSH keys per user has been reached.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                The maximum number of SSH keys per user has been reached:
+                  summary: The maximum number of SSH keys per user has been reached.
+                  value:
+                    group: ssh-key
+                    code: 500
+                    message: The maximum number of SSH keys per user has been reached.
+        '500':
+          description: |
+            - [group:**ssh-key**, code:**1000**]: Create SSH key encountered DB error.
+            - [group:**ssh-key**, code:**1200**]: Get SSH key count encountered DB error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Create SSH key encountered DB error:
+                  summary: Create SSH key encountered DB error.
+                  value:
+                    group: ssh-key
+                    code: 1000
+                    message: Create SSH key encountered DB error.
+                    traces: ["DB error occurred."]
+    get:
+      summary: List SSH keys
+      description: Retrieve a list of SSH keys for the current authenticated user.
+      operationId: listSSHKeys
+      tags:
+        - me
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: name
+          in: query
+          schema:
+            type: string
+          description: Filter SSH keys by name (case-insensitive partial match).
+          example: "My SSH key"
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty"
+          x-go-type-skip-optional-pointer: true
+        - name: fingerprint
+          in: query
+          schema:
+            type: string
+          description: Filter SSH keys by SHA-256 fingerprint (case-insensitive partial match).
+          example: "AbCdEfGhIjKlMnOpQrStUvWxYz1234567890"
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty"
+          x-go-type-skip-optional-pointer: true
+      responses:
+        '200':
+          description: Successfully retrieved the list of SSH keys.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/listSSHKeysResponse'
+        '500':
+          description: |
+            - [group:**ssh-key**, code:**1201**]: Get SSH key list encountered DB error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Get SSH key list encountered DB error:
+                  summary: Get SSH key list encountered DB error.
+                  value:
+                    group: ssh-key
+                    code: 1201
+                    message: Get SSH key list encountered DB error.
+                    traces: ["DB error occurred."]
+  /me/ssh-keys/{sshKeyId}:
+    patch:
+      summary: Update an SSH key.
+      description: |
+        Update the name of an SSH key owned by the currently authenticated user.
+        - Users can only update their own keys.
+      operationId: updateSSHKey
+      tags:
+        - me
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/sshKeyIdParam"
+      requestBody:
+        description: The request body for SSH key update.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/updateSSHKeyRequest'
+      responses:
+        '200':
+          description: Successfully updated the SSH key.
+        '400':
+          description: |
+            - [group:**request**, code:**0**]: Invalid field in the request.
+            - [group:**request**, code:**1**]: The request body is required.
+        '403':
+          description: |
+            - [group:**ssh-key**, code:**501**]: The user has no permission to access the SSH key.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                The user has no permission to access the SSH key:
+                  summary: The user has no permission to access the SSH key.
+                  value:
+                    group: ssh-key
+                    code: 501
+                    message: The user has no permission to access the SSH key.
+        '500':
+          description: |
+            - [group:**ssh-key**, code:**1202**]: Get SSH key encountered DB error.
+            - [group:**ssh-key**, code:**1400**]: Update SSH key encountered DB error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Update SSH key encountered DB error:
+                  summary: Update SSH key encountered DB error.
+                  value:
+                    group: ssh-key
+                    code: 1400
+                    message: Update SSH key encountered DB error.
+                    traces: ["DB error occurred."]
+    delete:
+      summary: Delete an SSH key.
+      description: |
+        Delete an SSH key owned by the currently authenticated user. 
+        - Users can only delete their own keys.
+      tags:
+        - me
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/sshKeyIdParam"
+      responses:
+        '200':
+          description: Successfully deleted the SSH key.
+        '400':
+          description: |
+            - [group:**request**, code:**0**]: Invalid field in the request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid field in the request:
+                  summary: Invalid field in the request.
+                  value:
+                    group: request
+                    code: 0
+                    validationDetail:
+                      - field: sshKeyId
+                        expression: uuid
+                        originalValue: "sshKeyId"
+                        reason: "Should be a valid UUID."
+        '500':
+          description: |
+            - [group:**ssh-key**, code:**1600**]: Delete SSH key encountered DB error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Delete SSH key encountered DB error:
+                  summary: Delete SSH key encountered DB error.
+                  value:
+                    group: ssh-key
+                    code: 1600
+                    message: Delete SSH key encountered DB error.
+                    traces: ["DB error occurred."]
+  /oauth/token:
+    post:
+      summary: Exchange authorization code for access token
+      description: Exchanges an authorization code for an access token.
+      operationId: exchangeAuthorizationCode
+      tags:
+        - oauth
+      requestBody:
+        description: The request body for exchanging authorization code.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/exchangeAuthorizationCodeRequest'
+      responses:
+        '200':
+          description: Successfully exchanged authorization code for access token.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/exchangeAuthorizationCodeResponse'
+        '400':
+          description: |
+            - [group:**oauth**, code:**0**]: Unsupported OAuth provider.
+            - [group:**oauth**, code:**2**]: Invalid authorization code.
+            - [group:**request**, code:**0**]: Invalid field in the request.
+            - [group:**request**, code:**1**]: The request body is required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid field in the request:
+                  summary: Invalid field in the request.
+                  value:
+                    group: request
+                    code: 0
+                    validationDetail:
+                      - field: code
+                        expression: required
+                        originalValue: ""
+                        reason: "This field is required."
+        '500':
+          description: |
+            - [group:**oauth**, code:**1200**]: Exchange authorization code encountered error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Exchange authorization code encountered error:
+                  summary: Exchange authorization code encountered error.
+                  value:
+                    group: oauth
+                    code: 1200
+                    message: Exchange authorization code encountered error.
+                    traces: ["error occurred."]
+  /organizations:
+    post:
+      summary: Register an organization
+      description: Allow users to register an organization. The user will automatically leave their current organization.
+      operationId: registerOrganization
+      tags:
+        - organizations
+      security:
+        - bearerAuth: []
+      requestBody:
+        description: The organization registration request body.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/registerOrganizationRequest'
+      responses:
+        '201':
+          description: Successfully registered the organization.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/registerOrganizationResponse'
+        '400':
+          description: |
+            - [group:**request**, code:**0**]: Invalid field in the request body.
+            - [group:**request**, code:**1**]: The request body is required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid field in the request body:
+                  summary: Invalid field in the request body.
+                  value:
+                    group: request
+                    code: 0
+                    validationDetail:
+                      - field: name
+                        expression: required
+                        originalValue: ""
+                        reason: "This field is required."
+                No request body:
+                  summary: No request body.
+                  value:
+                    group: request
+                    code: 1
+                    message: The request body is required.
+        '409':
+          description: |
+            - [group:**organization**, code:**0**]: User already owns an organization.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                User already owns an organization:
+                  summary: The user already owns an organization.
+                  value:
+                    group: organization
+                    code: 0
+                    message: User already owns an organization.
+        '500':
+          description: |
+            - [group:**organization**, code:**1000**]: Create organization encountered DB error.
+            - [group:**organization**, code:**1001**]: Create organization grouping policy encountered error.
+            - [group:**organization**, code:**1600**]: Delete organization grouping policy encountered error.
+            - [group:**session**, code:**3**]: Failed to save session to cache.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Create organization encountered DB error:
+                  summary: Create organization encountered DB error.
+                  value:
+                    group: organization
+                    code: 1000
+                    message: Create organization encountered DB error.
+                    traces: ["DB error occurred."]
+  /organizations/{orgId}:
+    get:
+      summary: Retrieve organization information
+      description: |
+        Retrieve information about a specific organization by its ID. 
+        Only users within the organization can access the API.
+      operationId: getOrganization
+      tags:
+        - organizations
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/orgIdParam"
+      responses:
+        '200':
+          description: Successfully retrieved organization information.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/getOrganizationInfoResponse'
+        '400':
+          description: |
+            - [group:**request**, code:**0**]: Invalid field in the request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid field in the request:
+                  summary: Invalid field in the request.
+                  value:
+                    group: request
+                    code: 0
+                    validationDetail:
+                      - field: orgId
+                        expression: uuid
+                        originalValue: ""
+                        reason: "Should be a valid UUID."
+        '404':
+          description: |
+            - [group:**organization**, code:**2**]: Organization does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Organization does not exist:
+                  summary: Organization does not exist.
+                  value:
+                    group: organization
+                    code: 2
+                    message: Organization does not exist.
+        '500':
+          description: |
+            - [group:**organization**, code:**1201**]: Get organization encountered DB error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Get organization encountered DB error:
+                  summary: Get organization encountered DB error.
+                  value:
+                    group: organization
+                    code: 1201
+                    message: Get organization encountered DB error.
+                    traces: ["DB error occurred."]
+    patch:
+      summary: Update organization information
+      description: Update information about a specific organization by its ID.
+      
+        - Only the `organization owner` can access the API.
+      operationId: updateOrganizationInfo
+      tags:
+        - organizations
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/orgIdParam"
+      requestBody:
+        description: The organization info update request body.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/updateOrganizationInfoRequest'
+      responses:
+        '200':
+          description: Successfully updated the organization info.
+        '400':
+          description: |
+            - [group:**request**, code:**1**]: The request body is required.
+            - [group:**request**, code:**0**]: Invalid field in the request body.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid field in the request:
+                  summary: Invalid field in the request.
+                  value:
+                    group: request
+                    code: 0
+                    validationDetail:
+                      - field: orgId
+                        expression: uuid
+                        originalValue: ""
+                        reason: "Should be a valid UUID."
+        '404':
+          description: |
+            - [group:**organization**, code:**2**]: Organization does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Organization does not exist:
+                  summary: Organization does not exist.
+                  value:
+                    group: organization
+                    code: 2
+                    message: Organization does not exist.
+        '500':
+          description: |
+            - [group:**organization**, code:**1201**]: Get organization encountered DB error.
+            - [group:**organization**, code:**1401**]: Update organization encountered DB error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Get organization encountered DB error:
+                  summary: Get organization encountered DB error.
+                  value:
+                    group: organization
+                    code: 1201
+                    message: Get organization encountered DB error.
+                    traces: ["DB error occurred."]
+    delete:
+      summary: Delete an organization
+      description: Deletes an organization.
+
+        - Allowed only if the organization has no users.
+
+        - Only the `organization owner` can access the API.
+
+        - The owner account will also be deleted.
+      operationId: deleteOrganization
+      tags:
+        - organizations
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/orgIdParam"
+      responses:
+        '200':
+          description: Successfully deleted the organization.
+        '400':
+          description: |
+            - [group:**request**, code:**0**]: Invalid field in the request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid field in the request:
+                  summary: Invalid field in the request.
+                  value:
+                    group: request
+                    code: 0
+                    validationDetail:
+                      - field: orgId
+                        expression: uuid
+                        originalValue: ""
+                        reason: "Should be a valid UUID."
+        '409':
+          description: |
+            - [group:**organization**, code:**10**]: Organization cannot be deleted because it still has users.
+            - [group:**organization**, code:**11**]: Organization cannot be deleted because it still has resources.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Organization cannot be deleted because it still has users:
+                  summary: Organization cannot be deleted because it still has users.
+                  value:
+                    group: organization
+                    code: 10
+                    message: Organization cannot be deleted because it still has users.
+        '500':
+          description: |
+            - [group:**invitation**, code:**202**]: Delete invitation encountered error.
+            - [group:**organization**, code:**12**]: Organization resource check encounter error.
+            - [group:**organization**, code:**1200**]: Get organization grouping policy encountered error.
+            - [group:**organization**, code:**1201**]: Get organization encountered DB error.
+            - [group:**organization**, code:**1601**]: Delete organization encountered DB error.
+            - [group:**session**, code:**5**]: Failed to delete session.
+            - [group:**user**, code:**210**]: Delete user password reset data encountered error.
+            - [group:**user**, code:**1200**]: Get user encountered DB error.
+            - [group:**user**, code:**1600**]: Delete user data encountered DB error.
+            - [group:**workflow**, code:**1200**]: Get workflows encountered error.
+            - [group:**workflow**, code:**1400**]: Send signal to workflow encountered error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Get organization grouping policy encountered error:
+                  summary: Get organization grouping policy encountered error.
+                  value:
+                    group: organization
+                    code: 1200
+                    message: Get organization grouping policy encountered error.
+                    traces: ["error occurred."]
+  /organizations/{orgId}/owner:
+    patch:
+      summary: Transfer organization ownership
+      description: | 
+        Transfers the ownership of an organization to another user within the organization.
+        - Only the current **organization owner** can perform this action.
+        - The new owner **must be an existing member** of the organization.
+        - The current owner **will be demoted to a regular user** after the transfer.
+      operationId: transferOrganizationOwner
+      tags:
+        - organizations
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/orgIdParam"
+      requestBody:
+        description: The request body for transferring ownership.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/transferOrganizationOwnerRequest'
+      responses:
+        '200':
+          description: Successfully transferred the organization ownership.
+        '400':
+          description: |
+            - [group:**request**, code:**0**]: Invalid field in the request.
+            - [group:**organization**, code:**4**]: User is already the owner of the organization.
+            - [group:**organization**, code:**5**]: User is not a member of this organization.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid field in the request:
+                  summary: Invalid field in the request.
+                  value:
+                    group: request
+                    code: 0
+                    validationDetail:
+                      - field: orgId
+                        expression: uuid
+                        originalValue: "orgId"
+                        reason: "Should be a valid UUID."
+        '404':
+          description: |
+            - [group:**organization**, code:**0**]: Organization does not exist.
+            - [group:**user**, code:**1**]: User does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Organization does not exist:
+                  summary: Organization does not exist.
+                  value:
+                    group: organization
+                    code: 0
+                    message: Organization does not exist.
+        '500':
+          description: |
+            - [group:**organization**, code:**1200**]: Get organization grouping policy encountered error.
+            - [group:**organization**, code:**1400**]: Update organization grouping policy encountered error.
+            - [group:**organization**, code:**1201**]: Get organization encountered DB error.
+            - [group:user, code:1200]: Get user encountered DB error.
+            - [group:**session**, code:**3**]: Failed to save session to cache.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Get organization grouping policy encountered error:
+                  summary: Get organization grouping policy encountered error.
+                  value:
+                    group: organization
+                    code: 1200
+                    message: Get organization grouping policy encountered error.
+                    traces: ["DB error occurred."]
+  /organizations/{orgId}/users:
+    get:
+      summary: List users by organization
+      description: Retrieve a list of users belonging to the specified organization. Only users within the organization can access the API.
+      tags:
+        - organizations
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/orgIdParam"
+      responses:
+        '200':
+          description: Successfully list users by organization.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/listUsersByOrganizationResponse'
+        '400':
+          description: |
+            - [group:**request**, code:**0**]: Invalid field in the request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid field in the request:
+                  summary: Invalid field in the request.
+                  value:
+                    group: request
+                    code: 0
+                    validationDetail:
+                      - field: orgId
+                        expression: uuid
+                        originalValue: "orgId"
+                        reason: "Should be a valid UUID."
+                No request body:
+                  summary: No request body.
+                  value:
+                    group: request
+                    code: 1
+                    message: The request body is required.
+        '404':
+          description: |
+            - [group:**organization**, code:**2**]: Organization does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Organization does not exist:
+                  summary: Organization does not exist.
+                  value:
+                    group: organization
+                    code: 2
+                    message: Organization does not exist.
+        '500':
+          description: |
+            - [group:**organization**, code:**1200**]: Get organization grouping policy encountered error.
+            - [group:**organization**, code:**1201**]: Get organization encountered DB error.
+            - [group:**user**, code:**1200**]: Get user encountered DB error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Get user encountered DB error:
+                  summary: Get user encountered DB error.
+                  value:
+                    group: user
+                    code: 1000
+                    message: Get user encountered DB error.
+                    traces: ["DB error occurred."]
+  /organizations/{orgId}/invitations/email:
+    post:
+      summary: Send invitations via email
+      description: Allows an organization admin to invite users via email.
+      operationId: sendInvitationsByEmail
+      tags:
+        - organizations
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/orgIdParam"
+      requestBody:
+        description: The invitations request body.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/sendInvitationsEmailRequest'
+      responses:
+        '201':
+          description: Successfully sent the invitations.
+        '400':
+          description: |
+            - [group:**request**, code:**0**]: Invalid field in the request.
+            - [group:**request**, code:**1**]: The request body is required.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid field in the request:
+                  summary: Invalid field in the request.
+                  value:
+                    group: request
+                    code: 0
+                    validationDetail:
+                      - field: emails
+                        expression: required
+                        originalValue: ""
+                        reason: "This field is required."
+                No request body:
+                  summary: No request body.
+                  value:
+                    group: request
+                    code: 1
+                    message: The request body is required.
+        '404':
+          description: |
+            - [group:**organization**, code:**2**]: Organization does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Organization does not exist:
+                  summary: Organization does not exist.
+                  value:
+                    group: organization
+                    code: 2
+                    message: Organization does not exist.
+        '409':
+          description: |
+            - [group:**invitation**, code:**0**]: The invitee already belongs to the organization.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                The invitee already belongs to the organization:
+                  summary: The invitee already belongs to the organization.
+                  value:
+                    group: invitation
+                    code: 0
+                    message: The invitee already belongs to the organization.
+        '500':
+          description: |
+            - [group:**email**, code:**0**]: Send email encountered error
+            - [group:**invitation**, code:**200**]: Save invitation encountered error.
+            - [group:**organization**, code:**1200**]: Get organization grouping policy encountered error.
+            - [group:**organization**, code:**1201**]: Get organization encountered DB error.
+            - [group:**user**, code:**1200**]: Get user encountered DB error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Get organization encountered DB error:
+                  summary: Get organization encountered DB error.
+                  value:
+                    group: organization
+                    code: 1201
+                    message: Get organization encountered DB error.
+                    traces: ["DB error occurred."]
+  /organizations/{orgId}/invitations/{invitationId}:
+    post:
+      summary: (DEPRECATED) Accept invitation
+      description: |
+        This API is deprecated, use POST /invitations/{invitationKey} instead. Allows user to accept an invitation to join the organization. The user will automatically leave their current organization.
+      deprecated: true
+      operationId: acceptInvitation
+      tags:
+        - organizations
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/orgIdParam"
+        - name: invitationId
+          in: path
+          schema:
+            type: string
+            format: uuid
+            x-go-type: uuid.UUID
+            example: 550e8400-e29b-41d4-a716-446655440000
+          required: true
+          description: |
+            The invitation's ID.
+            - Must be a valid UUID.
+      responses:
+        '200':
+          description: Successfully accepted the invitation.
+        '400':
+          description: |
+            - [group:**request**, code:**0**]: Invalid field in the request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid field in the request:
+                  summary: Invalid field in the request.
+                  value:
+                    group: request
+                    code: 0
+                    validationDetail:
+                      - field: orgId
+                        expression: uuid
+                        originalValue: "orgId"
+                        reason: "Should be a valid UUID."
+        '403':
+          description: |
+            - [group:**invitation**, code:**1**]: The user has no permission to access the invitation resources.
+            - [group:**invitation**, code:**2**]: The invitation has been revoked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                The user does not have permission to access invitation resources:
+                  summary: The user has no permission to access the invitation resources.
+                  value:
+                    group: invitation
+                    code: 1
+                    message: The user does not have permission to access invitation resources.
+        '404':
+          description: |
+            - [group:**organization**, code:**2**]: Organization does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Organization does not exist:
+                  summary: Organization does not exist.
+                  value:
+                    group: organization
+                    code: 2
+                    message: Organization does not exist.
+        '409':
+          description: |
+            - [group:**organization**, code:**0**]: User already owns an organization.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                User already owns an organization:
+                  summary: The user already owns an organization.
+                  value:
+                    group: organization
+                    code: 0
+                    message: User already owns an organization.
+        '500':
+          description: |
+            - [group:**invitation**, code:**200**]: Save invitation encountered error.
+            - [group:**invitation**, code:**201**]: Get invitation encountered error.
+            - [group:**organization**, code:**1201**]: Get organization encountered DB error.
+            - [group:**organization**, code:**1400**]: Update organization grouping policy encountered error.
+            - [group:**session**, code:**3**]: Failed to save session to cache.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Get organization encountered DB error:
+                  summary: Get organization encountered DB error.
+                  value:
+                    group: organization
+                    code: 1201
+                    message: Get organization encountered DB error.
+                    traces: ["DB error occurred."]
+  /organizations/{orgId}/api-keys:
+    post:
+      summary: Create an API key
+      description: Allows a user to generate an API key for their organization. 
+      operationId: createApiKey
+      tags:
+        - organizations
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/orgIdParam"
+      requestBody:
+        description: The API key creation request.
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/createApiKeyRequest'
+      responses:
+        '201':
+          description: Successfully created an API key.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/createApiKeyResponse'
+        '400':
+          description: |
+            - [group:**request**, code:**0**]: Invalid field in the request.
+            - [group:**request**, code:**1**]: The request body is required.
+            - [group:**api-key**, code:**0**]: The organization has reached the maximum number of API keys.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid field in the request:
+                  summary: Invalid field in the request.
+                  value:
+                    group: request
+                    code: 0
+                    validationDetail:
+                      - field: name
+                        expression: required
+                        originalValue: ""
+                        reason: "This field is required."
+                No request body:
+                  summary: No request body.
+                  value:
+                    group: request
+                    code: 1
+                    message: The request body is required.
+        '404':
+          description: |
+            - [group:**organization**, code:**2**]: Organization does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Organization does not exist:
+                  summary: Organization does not exist.
+                  value:
+                    group: organization
+                    code: 2
+                    message: Organization does not exist.
+        '500':
+          description: |
+            - [group:**api-key**, code:**1000**]: Create API key encountered DB error.
+            - [group:**api-key**, code:**1200**]: Get API key list encountered DB error.
+            - [group:**organization**, code:**1201**]: Get organization encountered DB error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Create api-key encountered DB error:
+                  summary: Create api-key encountered DB error.
+                  value:
+                    group: api-key
+                    code: 1000
+                    message: Create api-key encountered DB error.
+                    traces: ["DB error occurred."]
+    get:
+      summary: List API keys
+      description: |
+        Retrieve a list of API keys accessible by the authenticated user.
+          - **Organization owner/admin**: Can view all API keys within the organization.
+          - **Organization user**: Can only see their own API keys.
+      operationId: listApiKeys
+      tags:
+        - organizations
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/orgIdParam"
+      responses:
+        '200':
+          description: Successfully retrieved the list of API keys.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/listApiKeysResponse'
+        '400':
+          description: |
+            - [group:**request**, code:**0**]: Invalid field in the request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid field in the request:
+                  summary: Invalid field in the request.
+                  value:
+                    group: request
+                    code: 0
+                    validationDetail:
+                      - field: orgId
+                        expression: uuid
+                        originalValue: "orgId"
+                        reason: "Should be a valid UUID."
+        '404':
+          description: |
+            - [group:**organization**, code:**2**]: Organization does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Organization does not exist:
+                  summary: Organization does not exist.
+                  value:
+                    group: organization
+                    code: 2
+                    message: Organization does not exist.
+        '500':
+          description: |
+            - [group:**api-key**, code:**1200**]: Get API key list encountered DB error.
+            - [group:**organization**, code:**1201**]: Get organization encountered DB error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Get API key list encountered DB error:
+                  summary: Get API key list encountered DB error.
+                  value:
+                    group: api-key
+                    code: 1200
+                    message: Get API key list encountered DB error.
+                    traces: ["DB error occurred."]
+  /organizations/{orgId}/api-keys/{apiKeyId}:
+    delete:
+      summary: Delete an API key
+      description: |
+        Deletes an API key by its ID. 
+        - **Organization owner/admin**: Can delete any API key within their organization.
+        - **Organization user**: Can only delete the API keys they created.
+      operationId: deleteApiKey
+      tags:
+        - organizations
+      security:
+        - bearerAuth: []
+      parameters:
+        - $ref: "#/components/parameters/orgIdParam"
+        - name: apiKeyId
+          in: path
+          schema:
+            type: string
+            format: uuid
+            x-go-type: uuid.UUID
+            example: "550e8400-e29b-41d4-a716-446655440000"
+          required: true
+          description: |
+            The API key ID.
+            - Must be a valid UUID.
+      responses:
+        '200':
+          description: Successfully deleted an API key.
+        '400':
+          description: |
+            - [group:**request**, code:**0**]: Invalid field in the request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid field in the request:
+                  summary: Invalid field in the request.
+                  value:
+                    group: request
+                    code: 0
+                    validationDetail:
+                      - field: orgId
+                        expression: uuid
+                        originalValue: "orgId"
+                        reason: "Should be a valid UUID."
+        '404':
+          description: |
+            - [group:**organization**, code:**2**]: Organization does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Organization does not exist:
+                  summary: Organization does not exist.
+                  value:
+                    group: organization
+                    code: 2
+                    message: Organization does not exist.
+        '500':
+          description: |
+            - [group:**api-key**, code:**1201**]: Get API key encountered DB error.
+            - [group:**api-key**, code:**1600**]: Delete API key encountered DB error.
+            - [group:**organization**, code:**1201**]: Get organization encountered DB error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Get API key encountered DB error:
+                  summary: Get API key encountered DB error.
+                  value:
+                    group: api-key
+                    code: 1201
+                    message: Get API key encountered DB error.
+                    traces: ["DB error occurred."]
+  /invitations/{invitationKey}:
+    post:
+      summary: Accept invitation by key
+      description: |
+        Allows user to accept an invitation to join the organization using invitationKey. The user will automatically leave their current organization.
+      operationId: acceptInvitationByKey
+      tags:
+        - invitations
+      security:
+        - bearerAuth: []
+      parameters:
+        - name: invitationKey
+          in: path
+          schema:
+            type: string
+            example: CB8OZUZQUxddQG9DTAlGXg9Ea0IBV18EQ25FTFhAUVtcakdRU0JVRGUaDxodEwwdNhwLWRNVEToRAlVNSlQKbxFIVxcDTHIRA1oQSlsLPUoHB0FdRD5CUA
+          required: true
+          description: |
+            The invitation key for joining an existing organization.
+      responses:
+        '200':
+          description: Successfully accepted the invitation.
+        '400':
+          description: |
+            - [group:**invitation**, code:**3**]: Invalid invitationKey.
+            - [group:**request**, code:**0**]: Invalid field in the request.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Invalid field in the request:
+                  summary: Invalid field in the request.
+                  value:
+                    group: request
+                    code: 0
+                    validationDetail:
+                      - field: invitationKey
+                        expression: required
+                        originalValue: ""
+                        reason: "This field is required."
+        '403':
+          description: |
+            - [group:**invitation**, code:**1**]: The user has no permission to access the invitation resources.
+            - [group:**invitation**, code:**2**]: The invitation has been revoked.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                The user does not have permission to access invitation resources:
+                  summary: The user has no permission to access the invitation resources.
+                  value:
+                    group: invitation
+                    code: 1
+                    message: The user has no permission to access invitation resources.
+        '404':
+          description: |
+            - [group:**organization**, code:**2**]: Organization does not exist.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Organization does not exist:
+                  summary: Organization does not exist.
+                  value:
+                    group: organization
+                    code: 2
+                    message: Organization does not exist.
+        '409':
+          description: |
+            - [group:**organization**, code:**0**]: User already owns an organization.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                User already owns an organization:
+                  summary: The user already owns an organization.
+                  value:
+                    group: organization
+                    code: 0
+                    message: User already owns an organization.
+        '500':
+          description: |
+            - [group:**invitation**, code:**201**]: Get invitation encountered error.
+            - [group:**organization**, code:**1201**]: Get organization encountered DB error.
+            - [group:**organization**, code:**1400**]: Update organization grouping policy encountered error.
+            - [group:**session**, code:**3**]: Failed to save session to cache.
+            - [group:**user**, code:**1200**]: Get user encountered DB error.
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrStatusMsg'
+              examples:
+                Get organization encountered DB error:
+                  summary: Get organization encountered DB error.
+                  value:
+                    group: organization
+                    code: 1201
+                    message: Get organization encountered DB error.
+                    traces: ["DB error occurred."]
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        An access token used to authenticate a user and grant access to restricted APIs. It is issued by session APIs.
+        For status codes related to this header, refer to the 
+        [Common Headers Documentation](https://gmicloud.atlassian.net/wiki/spaces/CE/pages/47199534/Common+Headers#Authorization).
+    bearerAPIKey:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        An API key used to authenticate a user and grant access to restricted models. It is issued by api-keys APIs.
+    bearerEmailVerificationToken:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: |
+        A token used to verify the validity of an email address.
+        It must be included in the Authorization header when verifying the email address.
+  parameters:
+    clientIdParam:
+      name: CE-ClientId
+      in: header
+      schema:
+        type: string
+      required: true
+      description: |
+        A unique identifier to each user device and browser.
+        - Must be less than 8 characters.
+        - Only alphanumeric characters are allowed.
+    orgIdParam:
+      name: orgId
+      in: path
+      schema:
+        type: string
+        format: uuid
+        x-go-type: uuid.UUID
+        example: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+      required: true
+      description: |
+        The organization's ID.
+        - Must be a valid UUID.
+    userIdParam:
+      name: userId
+      in: path
+      schema:
+        type: string
+        format: uuid
+        x-go-type: uuid.UUID
+        example: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+      required: true
+      description: |
+        The user's ID.
+        - Must be a valid UUID.
+    sshKeyIdParam:
+      name: sshKeyId
+      in: path
+      schema:
+        type: string
+        format: uuid
+        x-go-type: uuid.UUID
+        example: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+      required: true
+      description: |
+        The ID of the SSH key
+        - Must be a valid UUID.
+  schemas:
+    userSignupRequest:
+      type: object
+      x-go-name: userSignupRequest
+      properties:
+        email:
+          type: string
+          description: |
+            User's email address which will be used as the account.
+            - Must be a valid email format.
+          example: john_doe@example.com
+          x-oapi-codegen-extra-tags:
+            binding: "required,email,emailCheck"
+        password:
+          type: string
+          description: The user's hashed password.
+          example: john_doe_password
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+        firstName:
+          type: string
+          description: The user's first name.
+          example: john
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty"
+          x-go-type-skip-optional-pointer: true
+        lastName:
+          type: string
+          description: The user's last name.
+          example: doe
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty"
+          x-go-type-skip-optional-pointer: true
+        organization:
+          type: object
+          $ref: "#/components/schemas/userSignupOrgInfo"
+        invitationKey:
+          type: string
+          description: Invitation key for joining an existing organization.
+          example: CB8OZUZQUxddQG9DTAlGXg9Ea0IBV18EQ25FTFhAUVtcakdRU0JVRGUaDxodEwwdNhwLWRNVEToRAlVNSlQKbxFIVxcDTHIRA1oQSlsLPUoHB0FdRD5CUA
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty"
+          x-go-type-skip-optional-pointer: true
+        recaptcha:
+          type: string
+          description: Google reCAPTCHA token. Required only when reCAPTCHA is enabled via the RECAPTCHA_ENABLED environment variable.
+          example: 03AFcWeA5I7G3wBtAhn76D2JmWD7Vxv7MwMaCHN0I2Z2iS-9s_q-WyVcD7sbfRtGi3e9oEfUHL_K7Cx2M3yEZ0
+          x-go-type-skip-optional-pointer: true
+      required:
+        - email
+        - password
+    userSignupOrgInfo:
+      type: object
+      description: Information for creating a new organization.
+      properties:
+        name:
+          type: string
+          description: The name of the new organization to create.
+          example: My New Org
+      x-oapi-codegen-extra-tags:
+        binding: "omitempty"
+      x-go-type-skip-optional-pointer: true
+      required:
+        - name
+    userSignupResponse:
+      type: object
+      x-go-name: userSignupResponse
+      properties:
+        emailVerificationToken:
+          type: string
+          description: A token used to verify the validity of an email address.
+          example: eyJhbGciOiJIUzI1NiIsInR...
+      required:
+        - emailVerificationToken
+    userOAuthSignupRequest:
+      type: object
+      x-go-name: userOAuthSignupRequest
+      properties:
+        provider:
+          type: string
+          description: |
+            The authentication provider used for signup.
+            - "google": User registers with Google OAuth.
+            - "github": User registers with Github OAuth.
+            - "hugging_face": User registers with Hugging Face OAuth.
+          # oapi-codegen issue: x-go-type extension and ref don't work together
+          # https://github.com/oapi-codegen/oapi-codegen/issues/863
+          enum:
+            - google
+            - github
+            - hugging_face
+          example: google
+          x-go-type: iamLibTypes.OAuthProvider
+          x-go-type-import:
+            path: us-central1-go.pkg.dev/gmi-cloud-cicd/go-dev/iam-lib-go/pkg/types
+            name: iamLibTypes
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+        accessToken:
+          type: string
+          description: OAuth access token (e.g., Google).
+          example: ya29.a0AfH6SMB...
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+        organization:
+          type: object
+          $ref: "#/components/schemas/userSignupOrgInfo"
+        invitationKey:
+          type: string
+          description: Invitation key for joining an existing organization.
+          example: CB8OZUZQUxddQG9DTAlGXg9Ea0IBV18EQ25FTFhAUVtcakdRU0JVRGUaDxodEwwdNhwLWRNVEToRAlVNSlQKbxFIVxcDTHIRA1oQSlsLPUoHB0FdRD5CUA
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty"
+          x-go-type-skip-optional-pointer: true
+      required:
+        - provider
+        - accessToken
+    userOAuthSignupResponse:
+      type: object
+      x-go-name: userOAuthSignupResponse
+      properties:
+        id:
+          type: string
+          format: uuid
+          x-go-type: uuid.UUID
+          description: The user's ID.
+          example: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        authToken:
+          type: string
+          description: A temporary token issued after the signup step. This token is used in the create session API to exchange for access and refresh tokens.
+          example: eyJhbGciOiJIUzI1NiIsInR...
+      required:
+        - id
+        - authToken
+    exchangeAuthorizationCodeRequest:
+      type: object
+      x-go-name: exchangeAuthorizationCodeRequest
+      properties:
+        provider:
+          type: string
+          description: |
+            The OAuth provider name.
+            - "github": GitHub OAuth.
+          enum:
+            - github
+          example: github
+          x-go-type: iamLibTypes.OAuthProvider
+          x-go-type-import:
+            path: us-central1-go.pkg.dev/gmi-cloud-cicd/go-dev/iam-lib-go/pkg/types
+            name: iamLibTypes
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+        code:
+          type: string
+          description: The OAuth authorization code received from the OAuth callback.
+          example: "abc123def456"
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+      required:
+        - provider
+        - code
+    exchangeAuthorizationCodeResponse:
+      type: object
+      x-go-name: exchangeAuthorizationCodeResponse
+      properties:
+        accessToken:
+          type: string
+          description: The OAuth access token that can be used to access the provider's API.
+          example: "ya29.a0AfH6SMB..."
+      required:
+        - accessToken
+    passwordResetRequest:
+      type: object
+      x-go-name: passwordResetRequest
+      properties:
+        email:
+          type: string
+          description: |
+            User's email address for requesting a password reset.
+            - Must be a valid email format.
+          example: john_doe@example.com
+          x-oapi-codegen-extra-tags:
+            binding: "required,email"
+      required:
+        - email
+    resendEmailVerificationCodeResponse:
+      type: object
+      x-go-name: resendEmailVerificationCodeResponse
+      properties:
+        emailVerificationToken:
+          type: string
+          description: A token used to verify the validity of an email address.
+          example: eyJhbGciOiJIUzI1NiIsInR...
+      required:
+        - emailVerificationToken
+    createAuthTokenRequest:
+      type: object
+      x-go-name: createAuthTokenRequest
+      properties:
+        email:
+          type: string
+          description: |
+            User's email address.
+            - Must be a valid email format.
+          example: john_doe@example.com
+          x-oapi-codegen-extra-tags:
+            binding: "required,email"
+        password:
+          type: string
+          description: User's password.
+          example: john_doe_password
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+      required:
+        - email
+        - password
+    authTokenResponse:
+      type: object
+      x-go-name: authTokenResponse
+      properties:
+        authToken:
+          type: string
+          description: A temporary token issued  after the initial login step. This token is used in the create session API to exchange for access and refresh tokens.
+          example: eyJhbGciOiJIUzI1NiIsInR...
+        is2FARequired:
+          type: boolean
+          description: Whether two-factor authentication (2FA) is required for the create session API. If `true`, the client must include an OTP code in the request body to complete the authentication.
+          example: true
+      required:
+        - authToken
+        - is2FARequired
+    createOAuthAuthTokenRequest:
+      type: object
+      x-go-name: createOAuthAuthTokenRequest
+      properties:
+        provider:
+          type: string
+          description: |
+            The authentication provider used for login.
+            - "google": User logs in with Google OAuth.
+            - "github": User logs in with Github OAuth.
+            - "hugging_face": User logs in with Hugging Face OAuth.
+          # oapi-codegen issue: x-go-type extension and ref don't work together
+          # https://github.com/oapi-codegen/oapi-codegen/issues/863
+          enum:
+            - google
+            - github
+            - hugging_face
+          example: google
+          x-go-type: iamLibTypes.OAuthProvider
+          x-go-type-import:
+            path: us-central1-go.pkg.dev/gmi-cloud-cicd/go-dev/iam-lib-go/pkg/types
+            name: iamLibTypes
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+        accessToken:
+          type: string
+          description: OAuth access token (e.g., Google).
+          example: ya29.a0AfH6SMB...
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+      required:
+        - provider
+        - accessToken
+    createOAuthAuthTokenResponse:
+      type: object
+      x-go-name: createOAuthAuthTokenResponse
+      properties:
+        authToken:
+          type: string
+          description: A temporary token issued  after the initial login step. This token is used in the create session API to exchange for access and refresh tokens.
+          example: eyJhbGciOiJIUzI1NiIsInR...
+      required:
+        - authToken
+    createSessionRequest:
+      type: object
+      x-go-name: createSessionRequest
+      properties:
+        authToken:
+          type: string
+          description: |
+            A temporary token issued by the create auth token API. This token is used in the create session API to exchange for access and refresh tokens.
+          example: eyJhbGciOiJIUzI1NiIsInR...
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+        otpCode:
+          type: string
+          description: |
+            (Optional) A one-time passcode (OTP) provided by the user for native login with 2FA verification.
+            - Must be a numeric code.
+            - This field is required only if the `is2FARequired` field in the `POST /me/auth-tokens` API response is `true`.
+          example: 321673
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,numeric"
+          x-go-type-skip-optional-pointer: true
+      required:
+        - type
+        - authToken
+    resend2FACodeRequest:
+      type: object
+      x-go-name: resend2FACodeRequest
+      properties:
+        authToken:
+          type: string
+          description: |
+            A temporary token issued by the create auth token API. This token is used in the create session API to exchange for access and refresh tokens.
+          example: eyJhbGciOiJIUzI1NiIsInR...
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+      required:
+        - authToken
+    refreshSessionRequest:
+      type: object
+      x-go-name: refreshSessionRequest
+      properties:
+        refreshToken:
+          type: string
+          description: The token to refresh the session. A refresh token can only be used once.
+          example: eyJhbGciOiJIUzI1NiIsInR...
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+      required:
+        - refreshToken
+    sessionResponse:
+      type: object
+      x-go-name: sessionResponse
+      properties:
+        accessToken:
+          type: string
+          description: The access token for API requests.
+          example: eyJhbGciOiJIUzI1NiIsInR...
+        refreshToken:
+          type: string
+          description: The refresh token for session management.
+          example: eyJhbGciOiJIUzI1NiIsInR...
+      required:
+        - accessToken
+        - refreshToken
+    registerOrganizationRequest:
+      type: object
+      x-go-name: registerOrganizationRequest
+      properties:
+        name:
+          type: string
+          description: The organization's name.
+          example: My Organization
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+      required:
+        - name
+    registerOrganizationResponse:
+      type: object
+      x-go-name: registerOrganizationResponse
+      properties:
+        id:
+          type: string
+          format: uuid
+          x-go-type: uuid.UUID
+          description: The organization's ID.
+          example: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+      required:
+        - id
+    getUserProfileResponse:
+      type: object
+      x-go-name: getUserProfileResponse
+      properties:
+        user:
+          type: object
+          $ref: "#/components/schemas/userProfileUserInfo"
+        organization:
+          type: object
+          $ref: "#/components/schemas/userProfileOrgInfo"
+      required:
+        - user
+    userProfileUserInfo:
+      type: object
+      description: Information about the user.
+      properties:
+        id:
+          type: string
+          format: uuid
+          x-go-type: uuid.UUID
+          description: The user's ID.
+          example: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        email:
+          type: string
+          description: The user's email address.
+          example: john.doe@example.com
+        firstName:
+          type: string
+          description: The user's first name.
+          example: john
+        lastName:
+          type: string
+          description: The user's last name.
+          example: doe
+        lastLoginAt:
+          type: integer
+          description: The UNIX timestamp in seconds (UTC) of the user's most recent login.
+            (UTC).
+          format: int64
+          example: 1740557336
+        lastLoginIDP:
+          type: string
+          description: |
+            The identity provider used during the user's most recent login.
+            - "native": Logged in with username and password.
+            - "google": Logged in using Google OAuth.
+            - "github": Logged in using GitHub OAuth.
+            - "hugging_face": Logged in using Hugging Face OAuth.
+          # oapi-codegen issue: x-go-type extension and ref don't work together
+          # https://github.com/oapi-codegen/oapi-codegen/issues/863
+          enum:
+            - native
+            - google
+            - github
+            - hugging_face
+          example: google
+          x-go-type: iamLibTypes.OAuthProvider
+          x-go-type-import:
+            path: us-central1-go.pkg.dev/gmi-cloud-cicd/go-dev/iam-lib-go/pkg/types
+            name: iamLibTypes
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+      required:
+        - id
+        - email
+        - firstName
+        - lastName
+        - lastLoginAt
+        - lastLoginIDP
+    userProfileOrgInfo:
+      type: object
+      description: |
+        Information about the organization the user belongs to. 
+        This field is omitted if the user does not belong to any organization.
+      properties:
+        id:
+          type: string
+          format: uuid
+          x-go-type: uuid.UUID
+          description: The user's organization ID.
+          example: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        role:
+          type: string
+          # oapi-codegen issue: x-go-type extension and ref don't work together
+          # https://github.com/oapi-codegen/oapi-codegen/issues/863
+          enum:
+            - org_owner
+            - org_user
+          x-go-type: ceCommonLibTypes.IasOrganizationRole
+          x-go-type-import:
+            path: us-central1-go.pkg.dev/gmi-cloud-cicd/go-dev/ce-common-lib-go/pkg/types
+            name: ceCommonLibTypes
+          description: The user's organization role.
+          example: org_owner
+      required:
+        - id
+        - role
+    getOrganizationInfoResponse:
+      type: object
+      x-go-name: getOrganizationInfoResponse
+      properties:
+        name:
+          type: string
+          description: The organization's name.
+          example: My Organization
+      required:
+        - name
+    listUsersByOrganizationResponse:
+      type: object
+      properties:
+        users:
+          type: array
+          description: A list of users in the specified organization.
+          items:
+            $ref: "#/components/schemas/userInOrganization"
+    userInOrganization:
+      type: object
+      description: Information about a user and their role within the organization.
+      properties:
+        id:
+          type: string
+          format: uuid
+          x-go-type: uuid.UUID
+          description: The user's ID.
+          example: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        email:
+          type: string
+          description: The user's email address.
+          example: john.doe@example.com
+        firstName:
+          type: string
+          description: The user's first name.
+          example: john
+        lastName:
+          type: string
+          description: The user's last name.
+          example: doe
+        lastLoginAt:
+          type: integer
+          description: The UNIX timestamp in seconds (UTC) of the user's most recent login.
+            (UTC).
+          format: int64
+          example: 1740557336
+        lastLoginIDP:
+          type: string
+          description: |
+            The identity provider used during the user's most recent login.
+            - "native": Logged in with username and password.
+            - "google": Logged in using Google OAuth.
+            - "github": Logged in using GitHub OAuth.
+            - "hugging_face": Logged in using Hugging Face OAuth.
+          # oapi-codegen issue: x-go-type extension and ref don't work together
+          # https://github.com/oapi-codegen/oapi-codegen/issues/863
+          enum:
+            - native
+            - google
+            - github
+            - hugging_face
+          example: google
+          x-go-type: iamLibTypes.OAuthProvider
+          x-go-type-import:
+            path: us-central1-go.pkg.dev/gmi-cloud-cicd/go-dev/iam-lib-go/pkg/types
+            name: iamLibTypes
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+        orgRole:
+          type: string
+          # oapi-codegen issue: x-go-type extension and ref don't work together
+          # https://github.com/oapi-codegen/oapi-codegen/issues/863
+          enum:
+            - org_owner
+            - org_user
+          x-go-type: ceCommonLibTypes.IasOrganizationRole
+          x-go-type-import:
+            path: us-central1-go.pkg.dev/gmi-cloud-cicd/go-dev/ce-common-lib-go/pkg/types
+            name: ceCommonLibTypes
+          description: The user's organization role.
+          example: org_owner
+      required:
+        - id
+        - email
+        - firstName
+        - lastName
+        - orgRole
+        - lastLoginAt
+        - lastLoginIDP
+    transferOrganizationOwnerRequest:
+      type: object
+      x-go-name: transferOrganizationOwnerRequest
+      properties:
+        newOwnerId:
+          type: string
+          description: The user ID of the new owner, who must be a current member of the organization.
+          example: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+          x-oapi-codegen-extra-tags:
+            binding: "required,uuid"
+      required:
+        - newOwnerId
+    sendInvitationsEmailRequest:
+      type: object
+      x-go-name: sendInvitationsEmailRequest
+      properties:
+        invitees:
+          type: array
+          items:
+            $ref: '#/components/schemas/inviteeInfo'
+          description: List of invitees' email and role.
+          x-oapi-codegen-extra-tags:
+            binding: "required,gt=0,dive"
+      required:
+        - invitees
+    inviteeInfo:
+      type: object
+      x-go-name: inviteeInfo
+      properties:
+        email:
+          type: string
+          description: The email address of the user to invite.
+          example: user@example.com
+          x-oapi-codegen-extra-tags:
+            binding: "required,email,emailCheck"
+        role:
+          type: string
+          description: The organization role assigned to the user.
+          # oapi-codegen issue: x-go-type extension and ref don't work together
+          # https://github.com/oapi-codegen/oapi-codegen/issues/863
+          enum:
+            - org_user
+          x-go-type: ceCommonLibTypes.IasOrganizationRole
+          x-go-type-import:
+            path: us-central1-go.pkg.dev/gmi-cloud-cicd/go-dev/ce-common-lib-go/pkg/types
+            name: ceCommonLibTypes
+          example: org_user
+          x-oapi-codegen-extra-tags:
+            binding: "required,oneof=org_user"
+      required:
+        - email
+        - role
+    createApiKeyRequest:
+      type: object
+      x-go-name: createApiKeyRequest
+      properties:
+        name:
+          type: string
+          description: The API key name.
+          example: My Service API Key
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+        scope:
+          type: string
+          description: The API key scope. Default value is `ie_model`.
+          # oapi-codegen issue: x-go-type extension and ref don't work together
+          # https://github.com/oapi-codegen/oapi-codegen/issues/863
+          enum:
+            - ie_model
+            - ce_resource
+          x-go-type: ceCommonLibTypes.IasAPIKeyScope
+          x-go-type-import:
+            path: us-central1-go.pkg.dev/gmi-cloud-cicd/go-dev/ce-common-lib-go/pkg/types
+            name: ceCommonLibTypes
+          example: ie_model
+          x-go-type-skip-optional-pointer: true
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,oneof=ie_model ce_resource"
+            default: "ie_model"
+        expiresAt:
+          type: integer
+          x-go-type: int64
+          description: |
+            The UNIX timestamp when API key will expire (UTC).
+            - Must be a UNIX timestamp in seconds and must be greater than the current time.
+            - If not set, the key will not expire.
+          example: 1738812775
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,expirationTime"
+      required:
+        - name
+    createApiKeyResponse:
+      type: object
+      x-go-name: createApiKeyResponse
+      properties:
+        key:
+          type: string
+          description: The generated API key (returned only once).
+          example: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpZCI6ImM2NDNh..."
+      required:
+        - key
+    verifyAPIKeyResponse:
+      type: object
+      x-go-name: verifyAPIKeyResponse
+      properties:
+        key:
+          type: object
+          $ref: "#/components/schemas/apiKeyInfo"
+        organization:
+          type: object
+          $ref: "#/components/schemas/apiKeyOrgInfo"
+      required:
+        - key
+        - organization
+    apiKeyInfo:
+      type: object
+      description: Information about the API key.
+      properties:
+        id:
+          type: string
+          format: uuid
+          x-go-type: uuid.UUID
+          description: The unique identifier for the API key.
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        type:
+          type: string
+          deprecated: true
+          x-go-type-skip-optional-pointer: true
+          description: |
+            The API key type. This field is deprecated and will be removed in a future version.
+            Use the `scope` field instead to specify the API key's scope.
+          # oapi-codegen issue: x-go-type extension and ref don't work together
+          # https://github.com/oapi-codegen/oapi-codegen/issues/863
+          enum:
+            - ie_model
+          x-go-type: ceCommonLibTypes.IasAPIKeyScope
+          x-go-type-import:
+            path: us-central1-go.pkg.dev/gmi-cloud-cicd/go-dev/ce-common-lib-go/pkg/types
+            name: ceCommonLibTypes
+          example: ie_model
+        scope:
+          type: string
+          description: The API key scope.
+          # oapi-codegen issue: x-go-type extension and ref don't work together
+          # https://github.com/oapi-codegen/oapi-codegen/issues/863
+          enum:
+            - ie_model
+            - ce_resource
+          x-go-type: ceCommonLibTypes.IasAPIKeyScope
+          x-go-type-import:
+            path: us-central1-go.pkg.dev/gmi-cloud-cicd/go-dev/ce-common-lib-go/pkg/types
+            name: ceCommonLibTypes
+          example: ie_model
+        owner:
+          type: object
+          $ref: "#/components/schemas/apiKeyOwnerInfo"
+      required:
+        - id
+        - scope
+        - owner
+    apiKeyOwnerInfo:
+      type: object
+      description: |
+        Information about the user who owns this API key
+      properties:
+        id:
+          type: string
+          format: uuid
+          x-go-type: uuid.UUID
+          description: The user ID.
+          example: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+      required:
+        - id
+    apiKeyOrgInfo:
+      type: object
+      description: |
+        The organization associated with the API key
+      properties:
+        id:
+          type: string
+          format: uuid
+          x-go-type: uuid.UUID
+          description: The organization ID.
+          example: "066daf34-08e8-40fe-a384-4248bcff5842"
+      required:
+        - id
+    listApiKeysResponse:
+      type: object
+      x-go-name: listApiKeysResponse
+      properties:
+        keys:
+          type: array
+          description: A list of API keys.
+          items:
+            $ref: "#/components/schemas/apiKeyListItem"
+      required:
+        - keys
+    apiKeyListItem:
+      type: object
+      description: Information about the API key.
+      properties:
+        id:
+          type: string
+          format: uuid
+          x-go-type: uuid.UUID
+          description: The unique identifier for the API key.
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        name:
+          type: string
+          description: The API key name.
+          example: My Service API Key
+        type:
+          type: string
+          deprecated: true
+          x-go-type-skip-optional-pointer: true
+          description: |
+            The API key type. This field is deprecated and will be removed in a future version.
+            Use the `scope` field instead to specify the API key's scope.
+          # oapi-codegen issue: x-go-type extension and ref don't work together
+          # https://github.com/oapi-codegen/oapi-codegen/issues/863
+          enum:
+            - ie_model
+          x-go-type: ceCommonLibTypes.IasAPIKeyScope
+          x-go-type-import:
+            path: us-central1-go.pkg.dev/gmi-cloud-cicd/go-dev/ce-common-lib-go/pkg/types
+            name: ceCommonLibTypes
+          example: ie_model
+        scope:
+          type: string
+          description: The API key scope.
+          # oapi-codegen issue: x-go-type extension and ref don't work together
+          # https://github.com/oapi-codegen/oapi-codegen/issues/863
+          enum:
+            - ie_model
+            - ce_resource
+          x-go-type: ceCommonLibTypes.IasAPIKeyScope
+          x-go-type-import:
+            path: us-central1-go.pkg.dev/gmi-cloud-cicd/go-dev/ce-common-lib-go/pkg/types
+            name: ceCommonLibTypes
+          example: ie_model
+        partialKey:
+          type: string
+          description: The last 10 characters of the API key.
+          example: 3D6l27ChEA
+        createdAt:
+          type: integer
+          x-go-type: int64
+          description: The UNIX timestamp in seconds when the API key was created (UTC).
+          example: 1738812775
+        expiresAt:
+          type: integer
+          x-go-type: int64
+          description: |
+            The UNIX timestamp (in seconds) indicating when the API key will expire (UTC).
+            If the value is `-1`, the API key does not expire.
+          example: 1738812775
+        owner:
+          type: object
+          $ref: "#/components/schemas/apiKeyListOwnerInfo"
+      required:
+        - id
+        - name
+        - scope
+        - partialKey
+        - createdAt
+        - expiresAt
+        - owner
+    apiKeyListOwnerInfo:
+      type: object
+      description: Information about the user who owns this API key.
+      properties:
+        id:
+          type: string
+          format: uuid
+          x-go-type: uuid.UUID
+          description: The user ID.
+          example: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        firstName:
+          type: string
+          description: The user first name.
+          example: john
+        lastName:
+          type: string
+          description: The user last name.
+          example: doe
+      required:
+        - id
+        - firstName
+        - lastName
+    updatePasswordRequest:
+      type: object
+      x-go-name: updatePasswordRequest
+      properties:
+        newPassword:
+          type: string
+          description: The new password.
+          example: MyNewSecurePassword123!
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+        currentPassword:
+          type: string
+          description: |
+            The user's current password for update password.
+            - This field is only required for authenticated users.
+          example: "OldPassword123!"
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty"
+          x-go-type-skip-optional-pointer: true
+        passwordResetToken:
+          type: string
+          description: |
+            A temporary Bearer token used for password reset authentication which is issued when a user requests a password reset.
+            - This field is only required for password reset users.
+          example: eyJhbGciOiJIUzI1NiIsInR...
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty"
+          x-go-type-skip-optional-pointer: true
+        otpCode:
+          type: string
+          description: |
+            A one-time passcode (OTP) for reset user password.
+            - Must be a numeric code.
+            - This field is only required for password reset users.
+          example: 321673
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty,numeric"
+          x-go-type-skip-optional-pointer: true
+      required:
+        - newPassword
+    emailVerificationRequest:
+      type: object
+      x-go-name: emailVerificationRequest
+      properties:
+        otpCode:
+          type: string
+          description: |
+            A one-time passcode (OTP) provided by the user for email verification.
+            - Must be a numeric code.
+          example: 321673
+          x-oapi-codegen-extra-tags:
+            binding: "required,numeric"
+          x-go-type-skip-optional-pointer: true
+      required:
+        - otpCode
+    emailVerificationResponse:
+      type: object
+      x-go-name: emailVerificationResponse
+      properties:
+        id:
+          type: string
+          format: uuid
+          x-go-type: uuid.UUID
+          description: The user's ID.
+          example: "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11"
+        authToken:
+          type: string
+          description: A temporary token issued after the signup step. This token is used in the create session API to exchange for access and refresh tokens.
+          example: eyJhbGciOiJIUzI1NiIsInR...
+      required:
+        - id
+        - authToken
+    updateProfileRequest:
+      type: object
+      x-go-name: updateProfileRequest
+      properties:
+        firstName:
+          type: string
+          description: The user's first name.
+          example: john
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty"
+          x-go-type-skip-optional-pointer: true
+        lastName:
+          type: string
+          description: The user's last name.
+          example: doe
+          x-oapi-codegen-extra-tags:
+            binding: "omitempty"
+          x-go-type-skip-optional-pointer: true
+    updateOrganizationInfoRequest:
+      type: object
+      x-go-name: updateOrganizationInfoRequest
+      properties:
+        name:
+          type: string
+          description: The organization's name.
+          example: My Organization
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+      required:
+        - name
+    createSSHKeyRequest:
+      type: object
+      x-go-name: createSSHKeyRequest
+      properties:
+        sshKey:
+          type: string
+          description: |
+            The full SSH public key supported by OpenSSH (e.g., ssh-rsa, ssh-ed25519, ecdsa-sha2-nistp256).
+          example: "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBn... user@host"
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+        name:
+          type: string
+          description: Human-readable name for the SSH key.
+          example: My SSH key
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+      required:
+        - sshKey
+        - name
+    createSSHKeyResponse:
+      type: object
+      properties:
+        id:
+          type: string
+          format: uuid
+          x-go-type: uuid.UUID
+          description: The unique identifier (UUID) of the newly created SSH key.
+          example: "550e8400-e29b-41d4-a716-446655440000"
+          x-go-type-skip-optional-pointer: true
+    listSSHKeysResponse:
+      type: object
+      x-go-name: listSSHKeysResponse
+      properties:
+        keys:
+          type: array
+          description: A list of SSH keys.
+          items:
+            $ref: "#/components/schemas/sshKeyListItem"
+      required:
+        - keys
+    sshKeyListItem:
+      type: object
+      x-go-name: sshKeyListItem
+      description: Information about an SSH key.
+      properties:
+        id:
+          type: string
+          format: uuid
+          x-go-type: uuid.UUID
+          description: The unique identifier for the SSH key.
+          example: "550e8400-e29b-41d4-a716-446655440000"
+        name:
+          type: string
+          description: The SSH key name.
+          example: "My SSH key"
+        fingerprint:
+          type: string
+          description: The SSH key fingerprint in SHA256 format.
+          example: "AbCdEfGhIjKlMnOpQrStUvWxYz1234567890"
+        createdAt:
+          type: integer
+          x-go-type: int64
+          description: The UNIX timestamp in seconds when the SSH key was created (UTC).
+          example: 1738812775
+      required:
+        - id
+        - name
+        - fingerprint
+        - createdAt
+    updateSSHKeyRequest:
+      type: object
+      x-go-name: updateSSHKeyRequest
+      properties:
+        name:
+          type: string
+          description: Human-readable name for the SSH key.
+          example: My Updated SSH key
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+      required:
+        - name
+# =====================
+# START OF ce-common-lib-go substatus MODELS
+# =====================
+# These models are sourced from the ce-common-lib-go.
+# For modifications:
+# 1. Update the original source at:
+#    https://gitlab.com/product-center/cluster-engine/ce-common-lib-go/-/blob/main/pkg/substatus/codegen/api.yaml
+# 2. Use oapi-codegen to generate the updated models.
+# 3. Copy the updated models api.yaml back to this file.
+# =====================
+    ErrStatusMsg:
+      type: object
+      properties:
+        group:
+          type: string
+          description: API function group\n -Will be "request" if there are invalid request parameters.
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+        code:
+          type: integer
+          description: The substatus error code for the API response.
+          x-oapi-codegen-extra-tags:
+            binding: "required"
+        message:
+          type: string
+          description: The substatus error Message for API response.
+          x-go-type-skip-optional-pointer: true
+        traces:
+          type: array
+          items:
+            type: string
+          description: The original error messages.
+          x-go-type-skip-optional-pointer: true
+        validationDetail:
+          type: array
+          items:
+            $ref: '#/components/schemas/ValidationDetail'
+          description: Returned when there are invalid request paremeters(group="request")\n List of invalid fields and the reason of error.
+          x-go-type-skip-optional-pointer: true
+      example:
+        group: request
+        code: 0
+        validationDetail:
+          - field: email
+            expression: required
+            originalValue: ''
+            reason: 'This field is required.'
+      required:
+        - group
+        - code
+    ValidationDetail:
+      type: object
+      properties:
+        field:
+          type: string
+          description: The field of the request data.
+          x-go-type-skip-optional-pointer: true
+        expression:
+          type: string
+          description: The form of violation.
+          x-go-type-skip-optional-pointer: true
+        argument:
+          type: string
+          description: The number or data to support the expression.
+          x-go-type-skip-optional-pointer: true
+        originalValue:
+          description: The original value from the request.
+          x-go-type-skip-optional-pointer: true
+        reason:
+          type: string
+          description: The reason for the validation error.
+          x-go-type-skip-optional-pointer: true
+      example:
+      - field: fieldXXX
+        expression: required
+        originalValue: ""
+        reason: "This field is required."
+# =====================
+# END OF ce-common-lib-go substatus MODELS
+# =====================
