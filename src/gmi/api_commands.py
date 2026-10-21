@@ -78,12 +78,13 @@ def api_list(service, method, search, as_json):
 
 @api_group.command("check")
 @click.option("--service", type=click.Choice(["iam","idc","sandbox","cluster"]))
-@click.option("--token", envvar="GMI_TOKEN")
+@click.option("--token")
 @click.option("--idc-name", envvar="GMI_SANDBOX_IDC_NAME")
 @click.option("--markdown", type=click.Path(dir_okay=False, writable=True))
 @click.option("--json", "as_json", is_flag=True)
 def api_check(service, token, idc_name, markdown, as_json):
     """Probe safe GET operations and classify access."""
+    token = token or os.environ.get("GMI_TOKEN")
     rows = _ops(service); results=[]; skipped=[]; credentials={}
     for o in rows:
         reasons=[]
