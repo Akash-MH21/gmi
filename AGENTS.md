@@ -16,7 +16,7 @@ The full plan, all committed:
 2. Interactive `gmi chat` with slash commands: `/model`, `/models`, `/system`,
    `/clear`, `/save`, `/load`, `/help`, `/exit`.
 3. Full API coverage generated from GMI's four published OpenAPI specs
-   (63 paths, 93 operations: IAM 30, Cluster Engine 41, Sandbox 21, IDC 1).
+   (93 operations: IAM 30, IDC 1, Sandbox 21, Cluster Engine 41).
    These counts change when GMI updates the specs, so recount before quoting them.
 4. `gmi sandbox` (GMI calls this AgentBox): create, exec, push/pull files, extend TTL, kill.
 5. `gmi mcp serve` (every operation as an MCP tool) and `gmi mcp login` to `mcp.gmicloud.ai/mcp`.
@@ -36,7 +36,10 @@ be finished the day before.
 | Day 5, Sat 24 | Fri 23 | `gmi mcp serve`, `gmi mcp login` |
 | Day 6, Sun 25 | Sat 24 | v1.0, docs, install one-liner, good first issues |
 
-## Verified facts about the GMI APIs (checked 2026-10-17)
+## Verified facts about the GMI APIs (checked 2026-10-21)
+
+- The vendored specs contain 93 operations: iam 30 (6 GET, 14 POST, 6 PATCH, 4 DELETE), idc 1 (1 GET), sandbox 21 (10 GET, 7 POST, 2 PATCH, 2 DELETE), and cluster 41 (18 GET, 13 POST, 4 PUT, 6 DELETE). Operation IDs exist for 90 operations. Tags are iam {invitations, me, oauth, organizations, users}, idc {idcs}, sandbox {Sandbox, Sandbox-Exec, Sandbox-Files, SandboxTemplate}, and cluster {baremetals, containers, elastic-ips, firewalls, images, logs, templates, vpcs}.
+- Servers are iam and idc `https://console.gmicloud.ai/api/v1`, sandbox `https://console.gmicloud.ai/api/v2`, and cluster `https://console.gmicloud.ai/api`. Eight operations have no auth, 77 use `bearerAuth`, one uses `bearerAPIKey`, two use `bearerEmailVerificationToken`, and five sandbox data-plane operations use `sandboxAccessToken` in `X-Access-Token`.
 
 - Inference is OpenAI-compatible. Base URL `https://api.gmi-serving.com/v1`.
   Auth: `Authorization: Bearer <API key>`. Chat: `POST /v1/chat/completions`
@@ -129,6 +132,7 @@ what people see first and what the demos show.
 - Tests: `pytest`. Unit tests for parsing and formatting. **Live tests** marked `@pytest.mark.live`, which run
   only when `GMI_API_KEY` is set, call the real API and keep spend tiny (`max_tokens` <= 16).
 - Style: plain, specific English in help text and docs. No em or en dashes anywhere.
+- Generate the API manifest with `python tools/gen_api.py`; verify it with `python tools/gen_api.py --check`.
 - Licence Apache-2.0. Git author `zkasuran <289388318+zkasuran@users.noreply.github.com>`.
 
 ## How to report back

@@ -1,0 +1,1992 @@
+{
+  "operations": [
+    {
+      "description": "Create baremetal servers",
+      "group": "baremetals",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "create-baremetals",
+      "path": "/v1/baremetals",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Create baremetal servers"
+    },
+    {
+      "description": "Delete baremetal server",
+      "group": "baremetals",
+      "header_parameters": [],
+      "method": "DELETE",
+      "name": "delete-baremetal",
+      "path": "/v1/baremetals/{id}",
+      "path_parameters": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Delete baremetal server"
+    },
+    {
+      "description": "Execute baremetal server action",
+      "group": "baremetals",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "execute-baremetal-action",
+      "path": "/v1/baremetals/{id}/actions",
+      "path_parameters": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [
+          {
+            "enum": [
+              "start",
+              "stop",
+              "powercycle",
+              "reboot"
+            ],
+            "name": "type",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "required": false
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Execute baremetal server action"
+    },
+    {
+      "description": "Get baremetal server by ID",
+      "group": "baremetals",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "get-baremetal",
+      "path": "/v1/baremetals/{id}",
+      "path_parameters": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Get baremetal server by ID"
+    },
+    {
+      "description": "Get baremetal products",
+      "group": "baremetals",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "get-baremetal-products",
+      "path": "/v1/baremetals/products",
+      "path_parameters": [],
+      "query_parameters": [
+        {
+          "name": "idc",
+          "required": false,
+          "type": "idcName"
+        }
+      ],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Get baremetal products"
+    },
+    {
+      "description": "List all baremetal servers",
+      "group": "baremetals",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "list-baremetals",
+      "path": "/v1/baremetals",
+      "path_parameters": [],
+      "query_parameters": [
+        {
+          "name": "idc",
+          "required": false,
+          "type": "idcName"
+        }
+      ],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "List all baremetal servers"
+    },
+    {
+      "description": "Update baremetal server",
+      "group": "baremetals",
+      "header_parameters": [],
+      "method": "PUT",
+      "name": "update-baremetal",
+      "path": "/v1/baremetals/{id}",
+      "path_parameters": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [
+          {
+            "name": "name",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Update baremetal server"
+    },
+    {
+      "description": "Generate container shell URL path",
+      "group": "containers",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "container-shell",
+      "path": "/v1/containers/{id}/shell",
+      "path_parameters": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Generate container shell URL path"
+    },
+    {
+      "description": "create Container under default namespace",
+      "group": "containers",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "create-container",
+      "path": "/v1/containers",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Create containers"
+    },
+    {
+      "description": "Delete container",
+      "group": "containers",
+      "header_parameters": [],
+      "method": "DELETE",
+      "name": "delete-containers",
+      "path": "/v1/containers/{id}",
+      "path_parameters": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Delete container"
+    },
+    {
+      "description": "Download container logs",
+      "group": "containers",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "download-log",
+      "path": "/v1/containers/{id}/logs",
+      "path_parameters": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Download container logs"
+    },
+    {
+      "description": "Get container info by ID",
+      "group": "containers",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "get-container",
+      "path": "/v1/containers/{id}",
+      "path_parameters": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Get container info by ID"
+    },
+    {
+      "description": "Get container products",
+      "group": "containers",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "get-container-products",
+      "path": "/v1/containers/products",
+      "path_parameters": [],
+      "query_parameters": [
+        {
+          "name": "idc",
+          "required": false,
+          "type": "idcName"
+        }
+      ],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Get container products"
+    },
+    {
+      "description": "List container information",
+      "group": "containers",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "get-containers",
+      "path": "/v1/containers",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "List container information"
+    },
+    {
+      "description": "Restart container",
+      "group": "containers",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "restart-container",
+      "path": "/v1/containers/{id}/restart",
+      "path_parameters": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Restart container"
+    },
+    {
+      "description": "Update container",
+      "group": "containers",
+      "header_parameters": [],
+      "method": "PUT",
+      "name": "update-container",
+      "path": "/v1/containers/{id}",
+      "path_parameters": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Update container"
+    },
+    {
+      "description": "Allocate elastic IP for organization",
+      "group": "elastic-ips",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "allocate-elastic-ip",
+      "path": "/v1/elastic-ips",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": false
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Allocate elastic IP for organization"
+    },
+    {
+      "description": "Associate elastic IP with instance",
+      "group": "elastic-ips",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "associate-elastic-ip",
+      "path": "/v1/elastic-ips/{id}/associate",
+      "path_parameters": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": false
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Associate elastic IP with instance"
+    },
+    {
+      "description": "Disassociate elastic IP from instance",
+      "group": "elastic-ips",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "disassociate-elastic-ip",
+      "path": "/v1/elastic-ips/{id}/disassociate",
+      "path_parameters": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Disassociate elastic IP from instance"
+    },
+    {
+      "description": "Get elastic IP",
+      "group": "elastic-ips",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "get-elastic-ip",
+      "path": "/v1/elastic-ips/{id}",
+      "path_parameters": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Get elastic IP"
+    },
+    {
+      "description": "Get elastic IP products",
+      "group": "elastic-ips",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "get-elastic-ip-products",
+      "path": "/v1/elastic-ips/products",
+      "path_parameters": [],
+      "query_parameters": [
+        {
+          "name": "idc",
+          "required": false,
+          "type": "idcName"
+        }
+      ],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Get elastic IP products"
+    },
+    {
+      "description": "Get elastic IP",
+      "group": "elastic-ips",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "list-elastic-ip",
+      "path": "/v1/elastic-ips",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Get elastic IP"
+    },
+    {
+      "description": "Release elastic IP",
+      "group": "elastic-ips",
+      "header_parameters": [],
+      "method": "DELETE",
+      "name": "release-elastic-ip",
+      "path": "/v1/elastic-ips/{id}",
+      "path_parameters": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Release elastic IP"
+    },
+    {
+      "description": "Associate firewall",
+      "group": "firewalls",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "associate-firewall",
+      "path": "/v1/firewalls/{id}/associate",
+      "path_parameters": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [
+          {
+            "name": "instances",
+            "required": true,
+            "type": "UuidList"
+          },
+          {
+            "enum": [
+              "baremetal",
+              "container"
+            ],
+            "name": "instanceType",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Associate firewall"
+    },
+    {
+      "description": "Create firewall",
+      "group": "firewalls",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "create-firewall",
+      "path": "/v1/firewalls",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Create firewall"
+    },
+    {
+      "description": "Delete firewall",
+      "group": "firewalls",
+      "header_parameters": [],
+      "method": "DELETE",
+      "name": "delete-firewall",
+      "path": "/v1/firewalls/{id}",
+      "path_parameters": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Delete firewall"
+    },
+    {
+      "description": "Disassociate firewall",
+      "group": "firewalls",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "disassociate-firewall",
+      "path": "/v1/firewalls/{id}/disassociate",
+      "path_parameters": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [
+          {
+            "name": "instances",
+            "required": true,
+            "type": "UuidList"
+          },
+          {
+            "enum": [
+              "baremetal",
+              "container"
+            ],
+            "name": "instanceType",
+            "required": false,
+            "type": "string"
+          }
+        ],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Disassociate firewall"
+    },
+    {
+      "description": "Get firewall information by ID",
+      "group": "firewalls",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "get-firewall",
+      "path": "/v1/firewalls/{id}",
+      "path_parameters": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Get firewall information by ID"
+    },
+    {
+      "description": "List firewalls",
+      "group": "firewalls",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "list-firewalls",
+      "path": "/v1/firewalls",
+      "path_parameters": [],
+      "query_parameters": [
+        {
+          "name": "idc",
+          "required": false,
+          "type": "idcName"
+        }
+      ],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "List firewalls"
+    },
+    {
+      "description": "Update firewall",
+      "group": "firewalls",
+      "header_parameters": [],
+      "method": "PUT",
+      "name": "update-firewall",
+      "path": "/v1/firewalls/{id}",
+      "path_parameters": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Update firewall"
+    },
+    {
+      "description": "Get image by ID",
+      "group": "images",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "get-image",
+      "path": "/v1/images/{id}",
+      "path_parameters": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Get image by ID"
+    },
+    {
+      "description": "List images",
+      "group": "images",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "list-images",
+      "path": "/v1/images",
+      "path_parameters": [],
+      "query_parameters": [
+        {
+          "name": "idc",
+          "required": false,
+          "type": "idcName"
+        },
+        {
+          "name": "product",
+          "required": false,
+          "type": "productName"
+        }
+      ],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "List images"
+    },
+    {
+      "description": "create template",
+      "group": "templates",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "create-templates",
+      "path": "/v1/templates",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Create template"
+    },
+    {
+      "description": "Delete template",
+      "group": "templates",
+      "header_parameters": [],
+      "method": "DELETE",
+      "name": "delete-template",
+      "path": "/v1/templates/{id}",
+      "path_parameters": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Delete template"
+    },
+    {
+      "description": "Get template",
+      "group": "templates",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "get-template",
+      "path": "/v1/templates/{id}",
+      "path_parameters": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Get template"
+    },
+    {
+      "description": "Get templates list",
+      "group": "templates",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "get-templates",
+      "path": "/v1/templates",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Get templates list"
+    },
+    {
+      "description": "Update template",
+      "group": "templates",
+      "header_parameters": [],
+      "method": "PUT",
+      "name": "update-templates",
+      "path": "/v1/templates/{id}",
+      "path_parameters": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Update template"
+    },
+    {
+      "description": "Allocate default VPC for organization in IDC",
+      "group": "vpcs",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "allocate-default-vpc",
+      "path": "/v1/vpcs",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [
+          {
+            "name": "idc",
+            "required": true,
+            "type": "idcName"
+          }
+        ],
+        "required": false
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Allocate default VPC for organization in IDC"
+    },
+    {
+      "description": "Get VPC",
+      "group": "vpcs",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "get-vpc",
+      "path": "/v1/vpcs/{id}",
+      "path_parameters": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Get VPC"
+    },
+    {
+      "description": "List all VPCs",
+      "group": "vpcs",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "list-vpcs",
+      "path": "/v1/vpcs",
+      "path_parameters": [],
+      "query_parameters": [
+        {
+          "name": "idc",
+          "required": false,
+          "type": "idcName"
+        }
+      ],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "List all VPCs"
+    },
+    {
+      "description": "Release default VPC",
+      "group": "vpcs",
+      "header_parameters": [],
+      "method": "DELETE",
+      "name": "release-default-vpc",
+      "path": "/v1/vpcs/{id}",
+      "path_parameters": [
+        {
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api",
+      "service": "cluster",
+      "summary": "Release default VPC"
+    },
+    {
+      "description": "Allows user to accept an invitation to join the organization using invitationKey",
+      "group": "invitations",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "accept-invitation-by-key",
+      "path": "/invitations/{invitationKey}",
+      "path_parameters": [
+        {
+          "name": "invitationKey",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Accept invitation by key"
+    },
+    {
+      "description": "Create a short-term authentication token using user credentials for exchanging access and refresh tokens",
+      "group": "me",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "create-auth-token",
+      "path": "/me/auth-tokens",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "none",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Create an auth token."
+    },
+    {
+      "description": "Create a short-term authentication token using a third-party OAuth provider (e",
+      "group": "me",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "create-auth-token-o-auth",
+      "path": "/me/oauth/auth-tokens",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "none",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Create an auth token via OAuth."
+    },
+    {
+      "description": "Create a login session for user",
+      "group": "me",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "create-session",
+      "path": "/me/sessions",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "none",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Create session"
+    },
+    {
+      "description": "Create an SSH public key for the current authenticated user",
+      "group": "me",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "create-ssh-key",
+      "path": "/me/ssh-keys",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Create an SSH key"
+    },
+    {
+      "description": "Delete an SSH key owned by the currently authenticated user",
+      "group": "me",
+      "header_parameters": [],
+      "method": "DELETE",
+      "name": "delete-me-ssh-keys-ssh-key-id",
+      "path": "/me/ssh-keys/{sshKeyId}",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Delete an SSH key."
+    },
+    {
+      "description": "Retrieves the profile information of the current authenticated user",
+      "group": "me",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "get-user-profile",
+      "path": "/me/profile",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Retrieve user's profile"
+    },
+    {
+      "description": "Retrieve a list of SSH keys for the current authenticated user",
+      "group": "me",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "list-ssh-keys",
+      "path": "/me/ssh-keys",
+      "path_parameters": [],
+      "query_parameters": [
+        {
+          "name": "name",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "name": "fingerprint",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "List SSH keys"
+    },
+    {
+      "description": "Refresh an existing session, which will return a new access token and refresh token",
+      "group": "me",
+      "header_parameters": [],
+      "method": "PATCH",
+      "name": "refresh-session",
+      "path": "/me/sessions",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "none",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Refresh session"
+    },
+    {
+      "description": "Resend 2FA verificaion code",
+      "group": "me",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "resend2-fa-code",
+      "path": "/me/2fa-verification-code",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "none",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Resend 2FA verification code."
+    },
+    {
+      "description": "Update the name of an SSH key owned by the currently authenticated user",
+      "group": "me",
+      "header_parameters": [],
+      "method": "PATCH",
+      "name": "update-ssh-key",
+      "path": "/me/ssh-keys/{sshKeyId}",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Update an SSH key."
+    },
+    {
+      "description": "Allows a user to update their password",
+      "group": "me",
+      "header_parameters": [],
+      "method": "PATCH",
+      "name": "update-user-password",
+      "path": "/me/password",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "none",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Update user password"
+    },
+    {
+      "description": "Update the current authenticated user's profile",
+      "group": "me",
+      "header_parameters": [],
+      "method": "PATCH",
+      "name": "update-user-profile",
+      "path": "/me/profile",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Update user's profile"
+    },
+    {
+      "description": "Validate the API key from the Authorization Bearer token and return the key details",
+      "group": "me",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "verify-api-key",
+      "path": "/me/api-keys/current",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAPIKey",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Verify API Key and retrieve the key details"
+    },
+    {
+      "description": "Exchanges an authorization code for an access token",
+      "group": "oauth",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "exchange-authorization-code",
+      "path": "/oauth/token",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "none",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Exchange authorization code for access token"
+    },
+    {
+      "description": "This API is deprecated, use POST /invitations/{invitationKey} instead",
+      "group": "organizations",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "accept-invitation",
+      "path": "/organizations/{orgId}/invitations/{invitationId}",
+      "path_parameters": [
+        {
+          "name": "invitationId",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "(DEPRECATED) Accept invitation"
+    },
+    {
+      "description": "Allows a user to generate an API key for their organization",
+      "group": "organizations",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "create-api-key",
+      "path": "/organizations/{orgId}/api-keys",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Create an API key"
+    },
+    {
+      "description": "Deletes an API key by its ID",
+      "group": "organizations",
+      "header_parameters": [],
+      "method": "DELETE",
+      "name": "delete-api-key",
+      "path": "/organizations/{orgId}/api-keys/{apiKeyId}",
+      "path_parameters": [
+        {
+          "name": "apiKeyId",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Delete an API key"
+    },
+    {
+      "description": "Deletes an organization",
+      "group": "organizations",
+      "header_parameters": [],
+      "method": "DELETE",
+      "name": "delete-organization",
+      "path": "/organizations/{orgId}",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Delete an organization"
+    },
+    {
+      "description": "Retrieve information about a specific organization by its ID",
+      "group": "organizations",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "get-organization",
+      "path": "/organizations/{orgId}",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Retrieve organization information"
+    },
+    {
+      "description": "Retrieve a list of users belonging to the specified organization",
+      "group": "organizations",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "get-organizations-org-id-users",
+      "path": "/organizations/{orgId}/users",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "List users by organization"
+    },
+    {
+      "description": "Retrieve a list of API keys accessible by the authenticated user",
+      "group": "organizations",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "list-api-keys",
+      "path": "/organizations/{orgId}/api-keys",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "List API keys"
+    },
+    {
+      "description": "Allow users to register an organization",
+      "group": "organizations",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "register-organization",
+      "path": "/organizations",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Register an organization"
+    },
+    {
+      "description": "Allows an organization admin to invite users via email",
+      "group": "organizations",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "send-invitations-by-email",
+      "path": "/organizations/{orgId}/invitations/email",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Send invitations via email"
+    },
+    {
+      "description": "Transfers the ownership of an organization to another user within the organization",
+      "group": "organizations",
+      "header_parameters": [],
+      "method": "PATCH",
+      "name": "transfer-organization-owner",
+      "path": "/organizations/{orgId}/owner",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Transfer organization ownership"
+    },
+    {
+      "description": "Update information about a specific organization by its ID",
+      "group": "organizations",
+      "header_parameters": [],
+      "method": "PATCH",
+      "name": "update-organization-info",
+      "path": "/organizations/{orgId}",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Update organization information"
+    },
+    {
+      "description": "Delete a user account",
+      "group": "users",
+      "header_parameters": [],
+      "method": "DELETE",
+      "name": "delete-users-user-id",
+      "path": "/users/{userId}",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Delete a user account."
+    },
+    {
+      "description": "Confirms the user's email address and finalizes the the account creation process",
+      "group": "users",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "email-verification",
+      "path": "/users/email-verification",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerEmailVerificationToken",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Verify user's email and complete user registration."
+    },
+    {
+      "description": "Sends a password reset email to the user",
+      "group": "users",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "request-password-reset",
+      "path": "/users/password-reset",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Request password reset"
+    },
+    {
+      "description": "Resend email verificaion code",
+      "group": "users",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "resend-email-code-request",
+      "path": "/users/email-verification-code",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerEmailVerificationToken",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "iam",
+      "summary": "Resend email verification code"
+    },
+    {
+      "description": "Retrieves a list of IDC information that are not marked as hidden",
+      "group": "idcs",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "list-idcs",
+      "path": "/idcs",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "none",
+      "server": "https://console.gmicloud.ai/api/v1",
+      "service": "idc",
+      "summary": "List all IDCs"
+    },
+    {
+      "description": "Connects to a running sandbox and returns its data-plane connection info (domain and access token)",
+      "group": "Sandbox",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "connect-sandbox",
+      "path": "/sandboxes/{id}/connect",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": false
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v2",
+      "service": "sandbox",
+      "summary": "Connect to a sandbox"
+    },
+    {
+      "description": "Creates a sandbox from a `template_id`",
+      "group": "Sandbox",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "create-sandbox",
+      "path": "/sandboxes",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v2",
+      "service": "sandbox",
+      "summary": "Create a sandbox"
+    },
+    {
+      "description": "Accepts the deletion",
+      "group": "Sandbox",
+      "header_parameters": [],
+      "method": "DELETE",
+      "name": "delete-sandbox",
+      "path": "/sandboxes/{id}",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v2",
+      "service": "sandbox",
+      "summary": "Delete (kill) a sandbox"
+    },
+    {
+      "description": "Returns sandbox details",
+      "group": "Sandbox",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "get-sandbox",
+      "path": "/sandboxes/{id}",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v2",
+      "service": "sandbox",
+      "summary": "Get sandbox details"
+    },
+    {
+      "description": "Returns sandboxes that are still actionable or still worth watching: `provisioning`, `running`, `updating`, `checkpointing`, plus the terminal failure state `failed`",
+      "group": "Sandbox",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "list-sandboxes",
+      "path": "/sandboxes",
+      "path_parameters": [],
+      "query_parameters": [
+        {
+          "name": "state",
+          "required": false,
+          "type": "array"
+        },
+        {
+          "name": "metadata[key]",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v2",
+      "service": "sandbox",
+      "summary": "List active sandboxes"
+    },
+    {
+      "description": "Resets the time-to-live relative to the current time",
+      "group": "Sandbox",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "set-sandbox-timeout",
+      "path": "/sandboxes/{id}/timeout",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v2",
+      "service": "sandbox",
+      "summary": "Set sandbox timeout"
+    },
+    {
+      "description": "Replaces the customer-defined metadata as a whole — no per-key merging; passing an empty object clears it",
+      "group": "Sandbox",
+      "header_parameters": [],
+      "method": "PATCH",
+      "name": "update-sandbox",
+      "path": "/sandboxes/{id}",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v2",
+      "service": "sandbox",
+      "summary": "Update sandbox metadata"
+    },
+    {
+      "description": "Requests cancellation of a non-terminal execution",
+      "group": "Sandbox-Exec",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "cancel-sandbox-execution",
+      "path": "/executions/{execution_id}/cancel",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "sandboxAccessToken",
+      "server": "https://console.gmicloud.ai/api/v2",
+      "service": "sandbox",
+      "summary": "Cancel a sandbox execution"
+    },
+    {
+      "description": "Starts an asynchronous shell execution in the sandbox",
+      "group": "Sandbox-Exec",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "create-sandbox-execution",
+      "path": "/executions",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "sandboxAccessToken",
+      "server": "https://console.gmicloud.ai/api/v2",
+      "service": "sandbox",
+      "summary": "Execute a command in a sandbox"
+    },
+    {
+      "description": "Get a sandbox execution",
+      "group": "Sandbox-Exec",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "get-sandbox-execution",
+      "path": "/executions/{execution_id}",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "sandboxAccessToken",
+      "server": "https://console.gmicloud.ai/api/v2",
+      "service": "sandbox",
+      "summary": "Get a sandbox execution"
+    },
+    {
+      "description": "Reads a single file inside the sandbox by absolute path; the response body is the raw byte stream",
+      "group": "Sandbox-Files",
+      "header_parameters": [
+        {
+          "name": "Range",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "method": "GET",
+      "name": "download-sandbox-file",
+      "path": "/files",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": true,
+      "security_scheme": "sandboxAccessToken",
+      "server": "https://console.gmicloud.ai/api/v2",
+      "service": "sandbox",
+      "summary": "Download a sandbox file"
+    },
+    {
+      "description": "Writes one file to the given absolute path inside the sandbox via `multipart/form-data`, overwriting any existing file",
+      "group": "Sandbox-Files",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "upload-sandbox-file",
+      "path": "/files",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "multipart/form-data",
+        "properties": [
+          {
+            "name": "file",
+            "required": true,
+            "type": "string"
+          }
+        ],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "sandboxAccessToken",
+      "server": "https://console.gmicloud.ai/api/v2",
+      "service": "sandbox",
+      "summary": "Upload a sandbox file"
+    },
+    {
+      "description": "Creates a logical Template together with its initial Build",
+      "group": "SandboxTemplate",
+      "header_parameters": [],
+      "method": "POST",
+      "name": "create-template",
+      "path": "/templates",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v2",
+      "service": "sandbox",
+      "summary": "Create a Template and start its initial Build"
+    },
+    {
+      "description": "Soft-deletes the Template so it disappears from tenant-visible lists",
+      "group": "SandboxTemplate",
+      "header_parameters": [],
+      "method": "DELETE",
+      "name": "delete-template",
+      "path": "/templates/{id}",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v2",
+      "service": "sandbox",
+      "summary": "Delete a Template"
+    },
+    {
+      "description": "Returns the logical Template and its current and latest Build references",
+      "group": "SandboxTemplate",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "get-template",
+      "path": "/templates/{id}",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v2",
+      "service": "sandbox",
+      "summary": "Get a Template"
+    },
+    {
+      "description": "Returns normalized Build status and artifact availability",
+      "group": "SandboxTemplate",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "get-template-build",
+      "path": "/templates/{template_id}/builds/{id}",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v2",
+      "service": "sandbox",
+      "summary": "Get a Template Build"
+    },
+    {
+      "description": "Returns live logs for a Template Build",
+      "group": "SandboxTemplate",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "get-template-build-logs",
+      "path": "/templates/{template_id}/builds/{id}/logs",
+      "path_parameters": [],
+      "query_parameters": [
+        {
+          "default": 0,
+          "name": "offset",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "default": 100,
+          "name": "limit",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "enum": [
+            "debug",
+            "info",
+            "warn",
+            "error"
+          ],
+          "name": "level",
+          "required": false,
+          "type": "string"
+        }
+      ],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v2",
+      "service": "sandbox",
+      "summary": "Get live Template Build logs"
+    },
+    {
+      "description": "Unified product catalog query: identity, display name, status and\nresources per product",
+      "group": "SandboxTemplate",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "list-product-catalog",
+      "path": "/products",
+      "path_parameters": [],
+      "query_parameters": [
+        {
+          "default": "sandbox",
+          "enum": [
+            "sandbox"
+          ],
+          "name": "resource_type",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": false,
+          "name": "include_unavailable",
+          "required": false,
+          "type": "boolean"
+        }
+      ],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v2",
+      "service": "sandbox",
+      "summary": "List the product catalog (unified, tenant-facing)"
+    },
+    {
+      "description": "Lists immutable Build attempts in reverse chronological order",
+      "group": "SandboxTemplate",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "list-template-builds",
+      "path": "/templates/{template_id}/builds",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v2",
+      "service": "sandbox",
+      "summary": "List Template Builds"
+    },
+    {
+      "description": "Lists Templates visible to the authenticated organization",
+      "group": "SandboxTemplate",
+      "header_parameters": [],
+      "method": "GET",
+      "name": "list-templates",
+      "path": "/templates",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": null,
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v2",
+      "service": "sandbox",
+      "summary": "List Templates"
+    },
+    {
+      "description": "Updates mutable metadata only (`name`, `description`, `labels`)",
+      "group": "SandboxTemplate",
+      "header_parameters": [],
+      "method": "PATCH",
+      "name": "update-template",
+      "path": "/templates/{id}",
+      "path_parameters": [],
+      "query_parameters": [],
+      "request_body": {
+        "content_type": "application/json",
+        "properties": [],
+        "required": true
+      },
+      "returns_binary": false,
+      "security_scheme": "bearerAuth",
+      "server": "https://console.gmicloud.ai/api/v2",
+      "service": "sandbox",
+      "summary": "Update mutable Template metadata"
+    }
+  ],
+  "total": 93
+}

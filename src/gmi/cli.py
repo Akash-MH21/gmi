@@ -390,3 +390,9 @@ def chat(api_key, as_json, prompt, no_stream, model, system, max_tokens, no_retr
             emit(response)
         else:
             click.echo(response["choices"][0]["message"].get("content") or "")
+
+
+# Importing the command definition is cheap. Its manifest is loaded only when
+# Click needs to resolve a subcommand under ``gmi api``.
+from .api_commands import api_group
+main.add_command(api_group)
