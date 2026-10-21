@@ -39,7 +39,7 @@ be finished the day before.
 ## Verified facts about the GMI APIs (checked 2026-10-21)
 
 - The vendored specs contain 93 operations: iam 30 (6 GET, 14 POST, 6 PATCH, 4 DELETE), idc 1 (1 GET), sandbox 21 (10 GET, 7 POST, 2 PATCH, 2 DELETE), and cluster 41 (18 GET, 13 POST, 4 PUT, 6 DELETE). Operation IDs exist for 90 operations. Tags are iam {invitations, me, oauth, organizations, users}, idc {idcs}, sandbox {Sandbox, Sandbox-Exec, Sandbox-Files, SandboxTemplate}, and cluster {baremetals, containers, elastic-ips, firewalls, images, logs, templates, vpcs}.
-- Servers are iam and idc `https://console.gmicloud.ai/api/v1`, sandbox `https://console.gmicloud.ai/api/v2`, and cluster `https://console.gmicloud.ai/api`. Eight operations have no auth, 77 use `bearerAuth`, one uses `bearerAPIKey`, two use `bearerEmailVerificationToken`, and five sandbox data-plane operations use `sandboxAccessToken` in `X-Access-Token`.
+- Servers are iam and idc `https://console.gmicloud.ai/api/v1`, sandbox `https://console.gmicloud.ai/api/v2`, and cluster `https://console.gmicloud.ai/api`. Eight operations have no auth, 77 use `bearerAuth`, one uses `bearerAPIKey`, two use `bearerEmailVerificationToken`, and five sandbox data-plane operations use `sandboxAccessToken` in `X-Access-Token`. The inference key with scope `ie_model` is rejected by Sandbox and Cluster. Those services use a compute-scope key. Cluster write operations and operations that create GPU compute are untested and are not provisioned for this account.
 
 - Inference is OpenAI-compatible. Base URL `https://api.gmi-serving.com/v1`.
   Auth: `Authorization: Bearer <API key>`. Chat: `POST /v1/chat/completions`

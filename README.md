@@ -278,7 +278,14 @@ seedance-1-0-pro-fast-251015 success (27s)
 
 ## API commands
 
-Day 3 generates a command for every operation in the four vendored OpenAPI specs. The manifest has 93 operations: iam 30, idc 1, sandbox 21 and cluster 41.
+Day 3 generates a command for every operation in the four vendored OpenAPI specs. Run `gmi api check --markdown docs/API-COVERAGE.md` with the keys available to your account and see the current results in [docs/API-COVERAGE.md](docs/API-COVERAGE.md).
+
+| Service | Credential |
+|---|---|
+| IAM and IDC | The normal inference key from `GMI_API_KEY` or saved settings. |
+| Sandbox and Cluster | A compute key from `GMI_COMPUTE_API_KEY` or `GMI_SANDBOX_API_KEY`. |
+
+Create the compute key in the GMI console under API keys and select the compute scope. The inference key uses the `ie_model` scope and is rejected by Sandbox and Cluster.
 
 ```text
 $ gmi api list --service cluster
@@ -356,7 +363,6 @@ $ gmi api cluster baremetals delete-baremetal demo-id --dry-run --token session_
 
 Every non-GET asks for confirmation. DELETE also says `This deletes data.`. Use `--yes` for an intentional noninteractive call. `--dry-run` works without a key and sends nothing. Binary responses require `--out FILE`.
 
-The live run on 2026-10-21 is recorded in [docs/API-COVERAGE.md](docs/API-COVERAGE.md): generated 93 of 93, ran 27, 2 were ok and 25 needed another key type. 66 were not run because they need a path parameter, a required query parameter or are not GET operations. The current key has scope `ie_model` and product `IE`, so it reaches only a small part of this API. Session, cluster and sandbox key types are needed for the remaining protected operations.
 
 ## Configuration and privacy
 
