@@ -66,7 +66,7 @@ def api_check(service, as_json):
     scope={}
     try:
         with httpx.Client(headers={"Authorization":"Bearer "+key,"User-Agent":"gmi-cli/0.1.0"},timeout=30) as c:
-            r=c.get("https://console.gmicloud.ai/api/v1/me/api-keys/current"); value=r.json(); scope={"scope":value.get("scope"),"product":value.get("product")}
+            r=c.get("https://console.gmicloud.ai/api/v1/me/api-keys/current"); value=r.json(); value=value.get("key", value); scope={"scope":value.get("scope"),"product":value.get("product")}
     except Exception: scope={"scope":None,"product":None}
     report={"key":scope,"results":results,"skipped":skipped,"summary":{"generated":len(rows),"run":len(results),"not_run":len(skipped)}}
     if as_json: click.echo(json.dumps(report, separators=(",",":"))); return

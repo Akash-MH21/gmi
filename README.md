@@ -45,7 +45,7 @@ GMI Cloud has an OpenAI-compatible API, a Model Hub and a web console. `gmi` add
 - **Careful with your key.** Hidden prompt, verified before it is saved, stored with mode 600, never printed.
 
 > [!NOTE]
-> **Status: Day 2 of a six-day public build (20 to 25 Oct 2026).** What is in this README works today and was run against the live API. What is not built yet is listed in the [roadmap](#roadmap) and is not described anywhere else in this file.
+> **Status: Day 3 of a six-day public build (20 to 25 Oct 2026).** What is in this README works today and was run against the live API. What is not built yet is listed in the [roadmap](#roadmap) and is not described anywhere else in this file.
 
 ## Install
 
@@ -276,6 +276,88 @@ seedance-1-0-pro-fast-251015 success (27s)
 - Some models allow only a few requests per day. gmi tells you when the limit resets and does not retry.
 - A provider can be briefly unavailable. gmi retries twice, then says so and leaves the choice of another model to you.
 
+## API commands
+
+Day 3 generates a command for every operation in the four vendored OpenAPI specs. The manifest has 93 operations: iam 30, idc 1, sandbox 21 and cluster 41.
+
+```text
+$ gmi api list --service cluster
+cluster  baremetals  create-baremetals  POST  /v1/baremetals  bearerAuth
+cluster  baremetals  delete-baremetal  DELETE  /v1/baremetals/{id}  bearerAuth
+cluster  baremetals  execute-baremetal-action  POST  /v1/baremetals/{id}/actions  bearerAuth
+cluster  baremetals  get-baremetal  GET  /v1/baremetals/{id}  bearerAuth
+cluster  baremetals  get-baremetal-products  GET  /v1/baremetals/products  bearerAuth
+cluster  baremetals  list-baremetals  GET  /v1/baremetals  bearerAuth
+cluster  baremetals  update-baremetal  PUT  /v1/baremetals/{id}  bearerAuth
+cluster  containers  container-shell  POST  /v1/containers/{id}/shell  bearerAuth
+cluster  containers  create-container  POST  /v1/containers  bearerAuth
+cluster  containers  delete-containers  DELETE  /v1/containers/{id}  bearerAuth
+cluster  containers  download-log  GET  /v1/containers/{id}/logs  bearerAuth
+cluster  containers  get-container  GET  /v1/containers/{id}  bearerAuth
+cluster  containers  get-container-products  GET  /v1/containers/products  bearerAuth
+cluster  containers  get-containers  GET  /v1/containers  bearerAuth
+cluster  containers  restart-container  POST  /v1/containers/{id}/restart  bearerAuth
+cluster  containers  update-container  PUT  /v1/containers/{id}  bearerAuth
+cluster  elastic-ips  allocate-elastic-ip  POST  /v1/elastic-ips  bearerAuth
+cluster  elastic-ips  associate-elastic-ip  POST  /v1/elastic-ips/{id}/associate  bearerAuth
+cluster  elastic-ips  disassociate-elastic-ip  POST  /v1/elastic-ips/{id}/disassociate  bearerAuth
+cluster  elastic-ips  get-elastic-ip  GET  /v1/elastic-ips/{id}  bearerAuth
+cluster  elastic-ips  get-elastic-ip-products  GET  /v1/elastic-ips/products  bearerAuth
+cluster  elastic-ips  list-elastic-ip  GET  /v1/elastic-ips  bearerAuth
+cluster  elastic-ips  release-elastic-ip  DELETE  /v1/elastic-ips/{id}  bearerAuth
+cluster  firewalls  associate-firewall  POST  /v1/firewalls/{id}/associate  bearerAuth
+cluster  firewalls  create-firewall  POST  /v1/firewalls  bearerAuth
+cluster  firewalls  delete-firewall  DELETE  /v1/firewalls/{id}  bearerAuth
+cluster  firewalls  disassociate-firewall  POST  /v1/firewalls/{id}/disassociate  bearerAuth
+cluster  firewalls  get-firewall  GET  /v1/firewalls/{id}  bearerAuth
+cluster  firewalls  list-firewalls  GET  /v1/firewalls  bearerAuth
+cluster  firewalls  update-firewall  PUT  /v1/firewalls/{id}  bearerAuth
+cluster  images  get-image  GET  /v1/images/{id}  bearerAuth
+cluster  images  list-images  GET  /v1/images  bearerAuth
+cluster  templates  create-templates  POST  /v1/templates  bearerAuth
+cluster  templates  delete-template  DELETE  /v1/templates/{id}  bearerAuth
+cluster  templates  get-template  GET  /v1/templates/{id}  bearerAuth
+cluster  templates  get-templates  GET  /v1/templates  bearerAuth
+cluster  templates  update-templates  PUT  /v1/templates/{id}  bearerAuth
+cluster  vpcs  allocate-default-vpc  POST  /v1/vpcs  bearerAuth
+cluster  vpcs  get-vpc  GET  /v1/vpcs/{id}  bearerAuth
+cluster  vpcs  list-vpcs  GET  /v1/vpcs  bearerAuth
+cluster  vpcs  release-default-vpc  DELETE  /v1/vpcs/{id}  bearerAuth
+Total: 41
+```
+
+The IDC help and live call were:
+
+```text
+$ gmi api idc --help
+Usage: gmi api idc [OPTIONS] COMMAND [ARGS]...
+Commands:
+  idcs
+$ gmi api idc idcs list-idcs --json
+{"idcs":[{"country":"","countrySubdivision":"","idcId":"global","name":"Global","status":"available"}, ... ]}
+```
+
+Dry runs show the complete request and mask secrets:
+
+```text
+$ gmi api sandbox Sandbox create-sandbox --dry-run --token gmi_supersecretTOKEN123 --set template_id=demo
+{"method": "POST", "url": "https://console.gmicloud.ai/api/v2/sandboxes", "headers": {"Authorization": "gmi_...N123"}, "body": {"template_id": "demo"}}
+$ gmi api cluster baremetals delete-baremetal demo-id --dry-run --token session_secret_123
+{"method": "DELETE", "url": "https://console.gmicloud.ai/api/v1/baremetals/demo-id", "headers": {"Authorization": "gmi_..._123"}, "body": null}
+```
+
+| Auth scheme | What it needs |
+|---|---|
+| none | Sends no auth header. |
+| bearerAuth | Saved gmi key by default, or `--token` or `GMI_TOKEN`. |
+| bearerAPIKey | Saved gmi key by default, or `--token` or `GMI_TOKEN`. |
+| bearerEmailVerificationToken | Required `--token` or `GMI_TOKEN`. |
+| sandboxAccessToken | `--host` and `--access-token` or `GMI_SANDBOX_TOKEN`; sends only `X-Access-Token`. |
+
+Every non-GET asks for confirmation. DELETE also says `This deletes data.`. Use `--yes` for an intentional noninteractive call. `--dry-run` works without a key and sends nothing. Binary responses require `--out FILE`.
+
+The live run on 2026-10-21 is recorded in [docs/API-COVERAGE.md](docs/API-COVERAGE.md): generated 93 of 93, ran 27, 2 were ok and 25 needed another key type. 66 were not run because they need a path parameter, a required query parameter or are not GET operations. The current key has scope `ie_model` and product `IE`, so it reaches only a small part of this API. Session, cluster and sandbox key types are needed for the remaining protected operations.
+
 ## Configuration and privacy
 
 | Path | Contents |
@@ -326,7 +408,7 @@ Built in public, one working piece a day. The rule: nothing gets announced until
 |---|---|---|---|
 | 1 | Tue 20 Oct | The interactive session, `gmi models`, `gmi chat`, login and config | **Shipped** |
 | 2 | Wed 21 Oct | `/image`, `/video` and `/audio` in the session, plus scriptable commands | **Shipped** |
-| 3 | Thu 22 Oct | Commands generated from GMI's four published OpenAPI specs | Planned |
+| 3 | Thu 22 Oct | Commands generated from GMI's four published OpenAPI specs | **Shipped** |
 | 4 | Fri 23 Oct | `gmi sandbox` (AgentBox), then `gmi` itself on the AgentBox marketplace | Planned |
 | 5 | Sat 24 Oct | `gmi mcp serve`: every operation as an MCP tool for your agents | Planned |
 | 6 | Sun 25 Oct | v1.0: docs, install one-liner, good first issues | Planned |

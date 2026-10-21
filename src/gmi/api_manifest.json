@@ -11,7 +11,53 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "count",
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "name": "enableZabbixAgent",
+            "required": false,
+            "type": "boolean"
+          },
+          {
+            "name": "idc",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "imageId",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "internalIp",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "name",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "product",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "sshKey",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "sshKeyIdList",
+            "required": false,
+            "type": "array"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -363,7 +409,43 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "args",
+            "required": false,
+            "type": "array"
+          },
+          {
+            "name": "command",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "envs",
+            "required": false,
+            "type": "array"
+          },
+          {
+            "name": "name",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "ports",
+            "required": false,
+            "type": "array"
+          },
+          {
+            "name": "sshKeyIdList",
+            "required": false,
+            "type": "array"
+          },
+          {
+            "name": "templateId",
+            "required": true,
+            "type": "string"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -383,7 +465,28 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "count",
+            "required": true,
+            "type": "integer"
+          },
+          {
+            "name": "idc",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "name",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "product",
+            "required": true,
+            "type": "string"
+          }
+        ],
         "required": false
       },
       "returns_binary": false,
@@ -409,7 +512,22 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "instanceID",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "enum": [
+              "baremetal",
+              "container"
+            ],
+            "name": "instanceType",
+            "required": false,
+            "type": "string"
+          }
+        ],
         "required": false
       },
       "returns_binary": false,
@@ -543,7 +661,7 @@
           {
             "name": "instances",
             "required": true,
-            "type": "UuidList"
+            "type": "array"
           },
           {
             "enum": [
@@ -626,7 +744,7 @@
           {
             "name": "instances",
             "required": true,
-            "type": "UuidList"
+            "type": "array"
           },
           {
             "enum": [
@@ -707,7 +825,23 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "description",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "inboundRules",
+            "required": true,
+            "type": "array"
+          },
+          {
+            "name": "name",
+            "required": true,
+            "type": "string"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -776,7 +910,38 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "credential",
+            "required": false,
+            "type": "object"
+          },
+          {
+            "name": "description",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "name",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "enum": [
+              "draft",
+              "published",
+              "unpublished"
+            ],
+            "name": "status",
+            "required": false,
+            "type": "string"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -862,7 +1027,38 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "credential",
+            "required": false,
+            "type": "object"
+          },
+          {
+            "name": "description",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "name",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "path",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "enum": [
+              "draft",
+              "published",
+              "unpublished"
+            ],
+            "name": "status",
+            "required": false,
+            "type": "string"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -886,7 +1082,7 @@
           {
             "name": "idc",
             "required": true,
-            "type": "idcName"
+            "type": "string"
           }
         ],
         "required": false
@@ -996,7 +1192,18 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "email",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "password",
+            "required": true,
+            "type": "string"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -1016,7 +1223,23 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "enum": [
+              "google",
+              "github",
+              "hugging_face"
+            ],
+            "name": "provider",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "accessToken",
+            "required": true,
+            "type": "string"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -1036,7 +1259,18 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "authToken",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "otpCode",
+            "required": false,
+            "type": "string"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -1056,7 +1290,18 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "sshKey",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "name",
+            "required": true,
+            "type": "string"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -1135,7 +1380,13 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "refreshToken",
+            "required": true,
+            "type": "string"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -1155,7 +1406,13 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "authToken",
+            "required": true,
+            "type": "string"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -1175,7 +1432,13 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "name",
+            "required": true,
+            "type": "string"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -1195,7 +1458,28 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "newPassword",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "currentPassword",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "passwordResetToken",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "otpCode",
+            "required": false,
+            "type": "string"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -1215,7 +1499,18 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "firstName",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "lastName",
+            "required": false,
+            "type": "string"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -1251,7 +1546,21 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "enum": [
+              "github"
+            ],
+            "name": "provider",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "code",
+            "required": true,
+            "type": "string"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -1293,7 +1602,27 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "name",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "enum": [
+              "ie_model",
+              "ce_resource"
+            ],
+            "name": "scope",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "expiresAt",
+            "required": false,
+            "type": "integer"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -1399,7 +1728,13 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "name",
+            "required": true,
+            "type": "string"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -1419,7 +1754,13 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "invitees",
+            "required": true,
+            "type": "array"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -1439,7 +1780,13 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "newOwnerId",
+            "required": true,
+            "type": "string"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -1459,7 +1806,13 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "name",
+            "required": true,
+            "type": "string"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -1495,7 +1848,13 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "otpCode",
+            "required": true,
+            "type": "string"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -1515,7 +1874,13 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "email",
+            "required": true,
+            "type": "string"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -1567,7 +1932,13 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "timeout",
+            "required": false,
+            "type": "integer"
+          }
+        ],
         "required": false
       },
       "returns_binary": false,
@@ -1587,7 +1958,33 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "template_id",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "idc_name",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "timeout",
+            "required": false,
+            "type": "integer"
+          },
+          {
+            "name": "env_vars",
+            "required": false,
+            "type": "object"
+          },
+          {
+            "name": "metadata",
+            "required": false,
+            "type": "object"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -1666,7 +2063,13 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "timeout",
+            "required": false,
+            "type": "integer"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -1686,7 +2089,13 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "metadata",
+            "required": true,
+            "type": "object"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -1722,7 +2131,21 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "enum": [
+              "exec"
+            ],
+            "name": "action",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "parameters",
+            "required": true,
+            "type": "object"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -1806,7 +2229,38 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "name",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "description",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "idc_name",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "resources",
+            "required": true,
+            "type": "string"
+          },
+          {
+            "name": "labels",
+            "required": false,
+            "type": "object"
+          },
+          {
+            "name": "build",
+            "required": false,
+            "type": "string"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,
@@ -1978,7 +2432,23 @@
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
-        "properties": [],
+        "properties": [
+          {
+            "name": "name",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "description",
+            "required": false,
+            "type": "string"
+          },
+          {
+            "name": "labels",
+            "required": false,
+            "type": "object"
+          }
+        ],
         "required": true
       },
       "returns_binary": false,

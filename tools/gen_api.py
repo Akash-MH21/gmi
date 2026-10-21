@@ -25,13 +25,19 @@ def parameter(p):
     if "default" in s: out["default"] = s["default"]
     return out
 
-def body_info(op):
+def deref(schema, doc):
+    if isinstance(schema, dict) and "$ref" in schema:
+        return (doc.get("components", {}).get("schemas", {}).get(schema["$ref"].rsplit("/", 1)[-1]) or {})
+    return schema or {}
+
+def body_info(op, doc):
     body = op.get("requestBody") or {}
     content = body.get("content") or {}
     if not content: return None
-    ctype = sorted(content)[0]; schema = content[ctype].get("schema") or {}
+    ctype = sorted(content)[0]; schema = deref(content[ctype].get("schema"), doc)
     props = []
     for name, value in (schema.get("properties") or {}).items():
+        value = deref(value, doc)
         item = {"name": name, "type": schema_type(value), "required": name in (schema.get("required") or [])}
         if "enum" in value: item["enum"] = value["enum"]
         props.append(item)
@@ -64,7 +70,7 @@ def generate():
                 if service == "iam" and path == "/users/password-reset": scheme = "bearerAuth"
                 binary = any(ct.startswith("application/octet-stream") or ct.startswith("application/zip") for r in (op.get("responses") or {}).values() for ct in (r.get("content") or {}))
                 description = (op.get("description") or op.get("summary") or "").split(".", 1)[0].strip()
-                operations.append({"service":service,"group":tag,"name":name,"method":method.upper(),"path":path,"summary":op.get("summary", ""),"description":description,"path_parameters":paths,"query_parameters":query,"header_parameters":headers,"request_body":body_info(op),"security_scheme":scheme,"server":server,"returns_binary":binary})
+                operations.append({"service":service,"group":tag,"name":name,"method":method.upper(),"path":path,"summary":op.get("summary", ""),"description":description,"path_parameters":paths,"query_parameters":query,"header_parameters":headers,"request_body":body_info(op, doc),"security_scheme":scheme,"server":server,"returns_binary":binary})
     operations.sort(key=lambda x: (x["service"], x["group"], x["name"], x["method"], x["path"]))
     return {"operations": operations, "total": len(operations)}
 
