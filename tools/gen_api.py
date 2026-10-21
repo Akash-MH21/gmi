@@ -18,7 +18,9 @@ def schema_type(schema):
     if "$ref" in schema: return schema["$ref"].rsplit("/", 1)[-1]
     return schema.get("type", "string")
 
-def parameter(p):
+def parameter(p, doc=None):
+    if "$ref" in p and doc is not None:
+        p = (doc.get("components", {}).get("parameters", {}).get(p["$ref"].rsplit("/", 1)[-1]) or p)
     s = p.get("schema") or {}
     out = {"name": p.get("name"), "type": schema_type(s), "required": bool(p.get("required"))}
     if "enum" in s: out["enum"] = s["enum"]
@@ -60,9 +62,14 @@ def generate():
                 while name in used[tag]: name = f"{base}-{n}"; n += 1
                 used[tag][name] = True
                 params = list(path_item.get("parameters") or []) + list(op.get("parameters") or [])
-                paths = [parameter(p) for p in params if p.get("in") == "path"]
-                query = [parameter(p) for p in params if p.get("in") == "query"]
-                headers = [parameter(p) for p in params if p.get("in") == "header" and p.get("name", "").lower() not in {"authorization", "x-access-token"}]
+                resolved = []
+                for p in params:
+                    if "$ref" in p:
+                        p = (doc.get("components", {}).get("parameters", {}).get(p["$ref"].rsplit("/", 1)[-1]) or p)
+                    resolved.append(p)
+                paths = [parameter(p, doc) for p in resolved if p.get("in") == "path"]
+                query = [parameter(p, doc) for p in resolved if p.get("in") == "query"]
+                headers = [parameter(p, doc) for p in resolved if p.get("in") == "header" and p.get("name", "").lower() not in {"authorization", "x-access-token"}]
                 security = op.get("security", global_security)
                 scheme = "none" if security == [] or not security else next(iter((security[0] or {}).keys()), "none")
                 # The IAM password reset operation is documented as public in
