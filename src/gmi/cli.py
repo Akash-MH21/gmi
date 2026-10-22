@@ -399,3 +399,6 @@ main.add_command(api_group)
 
 from .sandbox import sandbox_group
 main.add_command(sandbox_group)
+
+from .serve import serve_command
+main.add_command(serve_command)

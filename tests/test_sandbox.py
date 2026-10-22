@@ -441,3 +441,16 @@ def test_create_rejects_invalid_env_before_http(cloud):
     assert result.exit_code == 1
     assert '--env requires K=V' in result.stderr
     assert not cloud.requests
+
+
+def test_default_idc_creation_survives_catalog_requiring_idc(cloud, monkeypatch):
+    handler = cloud.handler
+    def catalog_requires_idc(request):
+        if request.url.path.endswith('/products'):
+            assert 'idc_name' not in request.url.params
+            return httpx.Response(400, json={'message': 'idc_name is required'})
+        return handler(request)
+    monkeypatch.setattr(sandbox, 'HTTPTransport', lambda: httpx.MockTransport(catalog_requires_idc))
+    result = invoke(['create', 'template', '--yes', '--wait'])
+    assert_ok(result)
+    assert 'catalog prices are unavailable' in result.stderr

@@ -31,6 +31,12 @@ def idc_selection(flag=None):
     return {'idc_name': name} if name else {}
 
 
+class SandboxHTTPError(GMIError):
+    def __init__(self, status):
+        self.status = status
+        super().__init__(f'Sandbox HTTP {status}; check the request and account access.')
+
+
 class SandboxClient:
     def __init__(self, key=None):
         self.key, _, _ = _credential('sandbox', key, allow_missing=True)
@@ -82,7 +88,7 @@ class SandboxClient:
             if response.status_code in (401, 403) and not connection:
                 raise GMIError(f'Sandbox access rejected ({response.status_code}).' + COMPUTE_HINT)
             # Error envelopes can contain credentials. Never echo a raw body.
-            raise GMIError(f'Sandbox HTTP {response.status_code}; check the request and account access.')
+            raise SandboxHTTPError(response.status_code)
         if binary:
             return response.content
         try:
@@ -176,7 +182,14 @@ class SandboxClient:
         return value
 
     def estimate(self, idc_name=None, product=None):
-        products = self.data('GET', '/products', params=idc_selection(idc_name))
+        try:
+            products = self.data('GET', '/products', params=idc_selection(idc_name))
+        except SandboxHTTPError as error:
+            # The catalog requires an explicit IDC in some deployments. Creation
+            # can still use the organization's default when IDC is omitted.
+            if error.status != 400 or idc_selection(idc_name):
+                raise
+            products = []
         priced = [p for p in products if (not product or p.get('product') == product) and any(k in p for k in ('price', 'price_info', 'pricing'))]
         if priced:
             text = 'Catalog billing estimate: ' + json.dumps([{k: v for k, v in p.items() if k in ('product', 'price', 'price_info', 'pricing', 'unit', 'currency')} for p in priced])
@@ -360,7 +373,9 @@ def sandbox_list(client, as_json, state, idc_name):
 @click.argument('sandbox_id')
 @command_options
 def sandbox_get(client, as_json, sandbox_id):
-    emit(client, client.data('GET', f'/sandboxes/{component(sandbox_id)}'), as_json)
+    value = client.data('GET', f'/sandboxes/{component(sandbox_id)}')
+    client.check_deletion(value)
+    emit(client, value, as_json)
 
 
 @sandbox_group.command('kill')
