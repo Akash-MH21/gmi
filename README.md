@@ -441,10 +441,12 @@ unverified here. Runtime credentials are never logged or returned.
 
 The service rejects bad JSON with 400 and bodies above 64 KB with 413. Upstream
 errors return 502 with a short message and use a 30 second timeout. Offline tests
-call the service through HTTP with a local fake upstream. Live MaaS injection
-and deployment remain unverified. The Dockerfile runs as a non-root user with a
-health check. Image build, push and the five marketplace wizard steps are in
-[docs/AGENTBOX.md](docs/AGENTBOX.md); none has been performed in this build.
+call the service through HTTP with a local fake upstream. The image was also
+built and run locally on 22 October: it runs as a non-root user, reports healthy,
+answers a real chat through GMI, rejects a request without the token with 401 and
+writes no key to its logs. Pushing the image, GMI injecting the runtime key and
+the five marketplace wizard steps ([docs/AGENTBOX.md](docs/AGENTBOX.md)) have not
+been done.
 
 ## Configuration and privacy
 
@@ -497,7 +499,7 @@ Built in public, one working piece a day. The rule: nothing gets announced until
 | 1 | Tue 20 Oct | The interactive session, `gmi models`, `gmi chat`, login and config | **Shipped** |
 | 2 | Wed 21 Oct | `/image`, `/video` and `/audio` in the session, plus scriptable commands | **Shipped** |
 | 3 | Thu 22 Oct | Commands generated from GMI's four published OpenAPI specs | **Shipped** |
-| 4 | Fri 23 Oct | `gmi sandbox` and `gmi serve` | **Shipped: offline contracts and service tests.** Sandbox data plane unverified live. Docker and marketplace publication unverified. |
+| 4 | Fri 23 Oct | `gmi sandbox` and `gmi serve` | **Shipped: offline contracts and service tests.** Sandbox data plane unverified live. The image builds, runs and answers locally. Marketplace publication not done. |
 | 5 | Sat 24 Oct | `gmi mcp serve`: every operation as an MCP tool for your agents | Planned |
 | 6 | Sun 25 Oct | v1.0: docs, install one-liner, good first issues | Planned |
 

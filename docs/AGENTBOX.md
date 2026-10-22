@@ -2,9 +2,9 @@
 
 Day 4 adds sandbox commands and a small HTTP chat service. All new tests are
 offline. Control plane schemas come from `specs/sandbox_api.yaml` with the live
-findings supplied by the project owner on 22 October 2026. These commands have
-not been run against the live service during this build. The data plane is
-**unverified live**. No marketplace publication has happened.
+findings supplied by the project owner on 22 October 2026. The commands that
+reach the control plane were run live on 22 October (see Verification below).
+The data plane is **unverified live**. No marketplace publication has happened.
 
 ## Sandbox credentials and data centres
 
@@ -212,11 +212,14 @@ and cleanup after command failure or Ctrl+C. Local fake-upstream tests exercise
 redaction and upstream failures. They inspect the configured timeout without
 waiting 30 seconds.
 
-Live sandbox creation by this CLI, exec, file transfer, one-shot runs, service
-deployment, Docker build and runtime, registry push, marketplace submission,
-MaaS injection, gateway access control and Verified approval remain unverified.
-The data plane is unverified live because billing deleted the owner's sandboxes
-before it could be reached. No new live calls were made in this build.
+Verified on 22 October: the live catalogue and template calls, a one-shot run that
+stops with the platform's billing message and a local Docker build and run of the
+service image (non-root user, healthy, 401 without the token, a real chat answered
+through GMI, no key in the logs). Not verified: a running sandbox, exec, file
+transfer, registry push, marketplace submission, MaaS key injection, gateway access
+control and Verified approval. The data plane is unverified live because the
+platform deleted every sandbox for lack of billing permission before it could be
+reached.
 
 ```sh
 .venv/bin/pytest -q -m 'not live and not live_media'
