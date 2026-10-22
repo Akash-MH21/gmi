@@ -405,6 +405,7 @@ The following stdout examples use offline test fixtures. Lists use tab-separated
 columns and detail blocks stay within 10 lines. Add `--json` for the existing
 machine-readable output. Template creation with `--wait` prints build progress
 once per poll. Empty lists print `No templates.` or `No sandboxes.`
+Build logs print one line per entry or `No build logs.` when empty.
 
 ```text
 $ gmi sandbox templates create --name demo --yes
@@ -441,6 +442,28 @@ product: gmi.sandbox.small
 idc: us-central-iowa16
 started: 2026-10-22T12:00:00Z
 ends: 2026-10-22T12:05:00Z
+
+$ gmi sandbox create template --yes
+created sandbox box ends 2026-10-22T12:05:00Z
+
+$ gmi sandbox templates logs template
+line 0
+line 1
+
+$ gmi sandbox timeout box 900 --yes
+timeout set: box ends 2026-10-22T12:15:00Z
+
+$ gmi sandbox put box input.bin /home/user/data.bin --username user
+uploaded input.bin to /home/user/data.bin
+
+$ gmi sandbox get-file box /home/user/data.bin --out output.bin --username user
+downloaded /home/user/data.bin to output.bin (13 bytes)
+
+$ gmi sandbox kill box --yes
+killing sandbox box (accepted)
+
+$ gmi sandbox templates delete template --yes
+deleting template template (accepted)
 ```
 
 These are usage examples, not live execution results. The owner verified
@@ -451,7 +474,7 @@ the response supplies them. Otherwise gmi explains per-second runtime billing
 and credits where applicable without inventing a price.
 
 Creation prints the ID and end time. Access and traffic tokens are masked by
-default, including in JSON. Only `sandbox create --show-token` reveals them once
+default, including in JSON. Only `sandbox create --json --show-token` reveals them once
 with a secret warning. Exec and file operations connect for fresh tokens and send
 only `X-Access-Token` to the sandbox host. Exec returns the process exit code.
 `run` reuses a matching ready template or builds one, creates and waits for a

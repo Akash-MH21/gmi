@@ -624,3 +624,145 @@ def test_human_fields_redact_embedded_tokens_and_keep_single_lines(display_cloud
         assert len(result.stdout.splitlines()) <= 10
         assert '[redacted]' in result.stdout
         assert all(secret not in result.stdout + result.stderr for secret in (COMPUTE, ACCESS, TRAFFIC))
+
+
+SANDBOX_CREATE_OUTPUT = 'created sandbox box ends 2026-10-22T12:05:00Z\n'
+TEMPLATE_DELETE_OUTPUT = 'deleting template template (accepted)\n'
+SANDBOX_KILL_OUTPUT = 'killing sandbox box (accepted)\n'
+SANDBOX_TIMEOUT_OUTPUT = 'timeout set: box ends 2026-10-22T12:15:00Z\n'
+TEMPLATE_LOGS_OUTPUT = 'line 0\nline 1\n'
+UPLOAD_OUTPUT = 'uploaded input.bin to /home/user/data.bin\n'
+DOWNLOAD_OUTPUT = 'downloaded /home/user/data.bin to output.bin (13 bytes)\n'
+
+
+@pytest.mark.parametrize('as_json', [False, True])
+@pytest.mark.parametrize('command,human,payload', [
+    (['templates', 'delete', 'template', '--yes'], TEMPLATE_DELETE_OUTPUT,
+     {'id': 'template', 'deleted': True}),
+    (['templates', 'logs', 'template'], TEMPLATE_LOGS_OUTPUT,
+     [{'message': 'line 0'}, {'message': 'line 1'}]),
+    (['create', 'template', '--yes'], SANDBOX_CREATE_OUTPUT,
+     {'id': 'box', 'sandbox_key': 'old-host', 'domain': 'old.test',
+      'sandbox_access_token': '[redacted]', 'traffic_access_token': '[redacted]',
+      'state': 'running', 'end_at': '2026-10-22T12:05:00Z',
+      'metadata': {'echo': '[redacted]', 'traffic_access_token': '[redacted]'}}),
+    (['kill', 'box', '--yes'], SANDBOX_KILL_OUTPUT, {'id': 'box', 'state': 'deleting'}),
+    (['timeout', 'box', '900', '--yes'], SANDBOX_TIMEOUT_OUTPUT,
+     {'id': 'box', 'new_end_at': '2026-10-22T12:15:00Z'}),
+    (['put', 'box', 'input.bin', '/home/user/data.bin', '--username', 'user'], UPLOAD_OUTPUT,
+     {'path': '/home/user/data.bin', 'type': 'file'}),
+    (['get-file', 'box', '/home/user/data.bin', '--out', 'output.bin', '--username', 'user'],
+     DOWNLOAD_OUTPUT, {'path': 'output.bin', 'bytes': 13}),
+])
+def test_polished_output_and_unchanged_json_bytes(cloud, tmp_path, monkeypatch, command, human, payload, as_json):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / 'input.bin').write_bytes(b'file-content\x00')
+    result = invoke([*command, *(['--json'] if as_json else [])])
+    assert_ok(result)
+    expected = json.dumps(payload, ensure_ascii=False) + '\n' if as_json else human
+    assert result.stdout.encode('utf-8') == expected.encode('utf-8')
+    assert all(secret not in result.stdout + result.stderr for secret in (COMPUTE, ACCESS, TRAFFIC))
+    if command[0] == 'get-file':
+        assert (tmp_path / 'output.bin').read_bytes() == b'file-content\x00'
+
+
+@pytest.mark.parametrize('as_json', [False, True])
+@pytest.mark.parametrize('command,human', [
+    (['templates', 'delete', 'template', '--yes'], TEMPLATE_DELETE_OUTPUT),
+    (['kill', 'box', '--yes'], SANDBOX_KILL_OUTPUT),
+])
+def test_empty_202_deletion_output(cloud, monkeypatch, command, human, as_json):
+    requests = []
+    def accepted(request):
+        assert request.method == 'DELETE'
+        requests.append(request)
+        return httpx.Response(202)
+    monkeypatch.setattr(sandbox, 'HTTPTransport', lambda: httpx.MockTransport(accepted))
+    result = invoke([*command, *(['--json'] if as_json else [])])
+    assert_ok(result)
+    assert result.stdout.encode() == (b'{}\n' if as_json else human.encode())
+    assert len(requests) == 1  # No lookup to invent a name or poll deletion.
+
+
+@pytest.mark.parametrize('as_json', [False, True])
+def test_upload_schema_array_output(cloud, monkeypatch, tmp_path, as_json):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / 'input.bin').write_bytes(b'file-content\x00')
+    handler = cloud.handler
+    entries = [{'path': '/home/user/data.bin', 'name': 'data.bin', 'type': 'file'}]
+    def array_upload(request):
+        response = handler(request)
+        if request.url.path == '/files':
+            return httpx.Response(200, json=entries)
+        return response
+    monkeypatch.setattr(sandbox, 'HTTPTransport', lambda: httpx.MockTransport(array_upload))
+    result = invoke(['put', 'box', 'input.bin', '/home/user/data.bin', '--username', 'user',
+                     *(['--json'] if as_json else [])])
+    assert_ok(result)
+    expected = json.dumps(entries) + '\n' if as_json else UPLOAD_OUTPUT
+    assert result.stdout.encode() == expected.encode()
+
+
+@pytest.mark.parametrize('as_json', [False, True])
+def test_empty_build_logs_output(cloud, monkeypatch, as_json):
+    handler = cloud.handler
+    def no_logs(request):
+        if request.url.path.endswith('/logs'):
+            return httpx.Response(200, json={'data': {'entries': [], 'has_more': False, 'next_offset': 0}})
+        return handler(request)
+    monkeypatch.setattr(sandbox, 'HTTPTransport', lambda: httpx.MockTransport(no_logs))
+    result = invoke(['templates', 'logs', 'template', *(['--json'] if as_json else [])])
+    assert_ok(result)
+    assert result.stdout.encode() == (b'[]\n' if as_json else b'No build logs.\n')
+
+
+def test_timeout_uses_authoritative_response_expiry(cloud, monkeypatch):
+    def timeout(request):
+        return httpx.Response(200, json={'data': {
+            'id': 'box', 'old_end_at': '2026-10-22T12:05:00Z', 'new_end_at': '2026-10-23T01:02:03.123Z'}})
+    monkeypatch.setattr(sandbox, 'HTTPTransport', lambda: httpx.MockTransport(timeout))
+    result = invoke(['timeout', 'box', '900', '--yes'])
+    assert_ok(result)
+    assert result.stdout == 'timeout set: box ends 2026-10-23T01:02:03.123Z\n'
+
+
+def test_creation_does_not_invent_missing_expiry(cloud):
+    cloud.sandbox_detail['end_at'] = None
+    result = invoke(['create', 'template', '--yes'])
+    assert_ok(result)
+    assert result.stdout == 'created sandbox box ends -\n'
+
+
+@pytest.mark.parametrize('command', [
+    ['templates', 'delete', 'template', '--yes'], ['kill', 'box', '--yes'],
+    ['timeout', 'box', '900', '--yes'], ['templates', 'logs', 'template'],
+])
+def test_polished_response_fields_are_single_lines_and_redacted(cloud, monkeypatch, command):
+    handler = cloud.handler
+    def private_fields(request):
+        response = handler(request)
+        if request.method == 'DELETE' or request.url.path.endswith('/timeout'):
+            value = response.json()
+            value['data']['id'] = 'box\n' + COMPUTE
+            return httpx.Response(response.status_code, json=value)
+        if request.url.path.endswith('/logs'):
+            return httpx.Response(200, json={'data': {
+                'entries': [{'offset': 0, 'level': 'info', 'message': 'hello\n' + COMPUTE}],
+                'has_more': False, 'next_offset': 1}})
+        return response
+    monkeypatch.setattr(sandbox, 'HTTPTransport', lambda: httpx.MockTransport(private_fields))
+    result = invoke(command)
+    assert_ok(result)
+    assert len(result.stdout.splitlines()) == 1
+    assert '[redacted]' in result.stdout
+    assert all(secret not in result.stdout + result.stderr for secret in (COMPUTE, ACCESS, TRAFFIC))
+
+
+@pytest.mark.parametrize('filename', ['README.md', 'docs/AGENTBOX.md'])
+def test_polished_documentation_copies_tested_output(filename):
+    from pathlib import Path
+    text = (Path(__file__).resolve().parents[1] / filename).read_text()
+    for output in (SANDBOX_CREATE_OUTPUT, TEMPLATE_DELETE_OUTPUT, SANDBOX_KILL_OUTPUT,
+                   SANDBOX_TIMEOUT_OUTPUT, TEMPLATE_LOGS_OUTPUT, UPLOAD_OUTPUT, DOWNLOAD_OUTPUT):
+        assert output in text
+    assert '`No build logs.`' in text

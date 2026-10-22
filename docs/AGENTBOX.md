@@ -61,6 +61,7 @@ The following stdout examples use offline test fixtures. Lists use tab-separated
 columns and detail blocks stay within 10 lines. Add `--json` for the existing
 machine-readable output. Template creation with `--wait` prints build progress
 once per poll. Empty lists print `No templates.` or `No sandboxes.`
+Build logs print one line per entry or `No build logs.` when empty.
 
 ```text
 $ gmi sandbox templates create --name demo --yes
@@ -97,6 +98,28 @@ product: gmi.sandbox.small
 idc: us-central-iowa16
 started: 2026-10-22T12:00:00Z
 ends: 2026-10-22T12:05:00Z
+
+$ gmi sandbox create template --yes
+created sandbox box ends 2026-10-22T12:05:00Z
+
+$ gmi sandbox templates logs template
+line 0
+line 1
+
+$ gmi sandbox timeout box 900 --yes
+timeout set: box ends 2026-10-22T12:15:00Z
+
+$ gmi sandbox put box input.bin /home/user/data.bin --username user
+uploaded input.bin to /home/user/data.bin
+
+$ gmi sandbox get-file box /home/user/data.bin --out output.bin --username user
+downloaded /home/user/data.bin to output.bin (13 bytes)
+
+$ gmi sandbox kill box --yes
+killing sandbox box (accepted)
+
+$ gmi sandbox templates delete template --yes
+deleting template template (accepted)
 ```
 
 These are usage examples, not a record of live execution. The image must contain
@@ -115,7 +138,7 @@ sets the create wait deadline and defaults to 600 seconds. Creation prints the
 sandbox ID and the service's `end_at`; it does not invent an expiry time.
 
 Creation output masks sandbox access and traffic tokens by default, including
-JSON. Only `sandbox create --show-token` reveals those tokens once with a secret
+JSON. Only `sandbox create --json --show-token` reveals those tokens once with a secret
 warning on stderr. Avoid that option in logs or shared terminals. Known control
 and data plane credentials are redacted from other output, including exec output.
 Keys are never printed. Build logs and command output may contain other private
