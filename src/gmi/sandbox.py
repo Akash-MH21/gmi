@@ -142,7 +142,7 @@ class SandboxClient:
                 raise GMIError('Timed out waiting for sandbox; inspect it with gmi sandbox get.')
             time.sleep(min(5, max(0, deadline - time.monotonic())))
 
-    def wait_template(self, template_id, timeout=600):
+    def wait_template(self, template_id, timeout=600, progress=None):
         deadline = time.monotonic() + timeout
         while True:
             value = self.data('GET', f'/templates/{component(template_id)}')
@@ -155,6 +155,8 @@ class SandboxClient:
                 raise GMIError(self.scrub(f"Template build failed: {failure.get('message', 'unknown failure')} ({failure.get('code', 'unknown')})"))
             if time.monotonic() >= deadline:
                 raise GMIError('Timed out waiting for template build; inspect gmi sandbox templates logs.')
+            if progress:
+                progress()
             time.sleep(min(5, max(0, deadline - time.monotonic())))
 
     def create_template(self, name, image, product, commands=(), start_cmd=None, idc_name=None):
@@ -232,6 +234,25 @@ def emit(client, value, as_json=False, show_token=False):
     click.echo(json.dumps(client.scrub(value, show_token), ensure_ascii=False, indent=None if as_json else 2))
 
 
+def human_field(client, value):
+    """Keep each field on one line and redact known credentials."""
+    return ' '.join(str(client.scrub(value)).split()) if value is not None else '-'
+
+
+def human_table(client, rows, columns, empty):
+    if not rows:
+        click.echo(empty)
+        return
+    click.echo('\t'.join(label for label, key in columns))
+    for row in rows:
+        click.echo('\t'.join(human_field(client, row.get(key)) for label, key in columns))
+
+
+def human_details(client, fields):
+    for label, value in fields:
+        click.echo(f'{label}: {human_field(client, value)}')
+
+
 def confirm(yes, as_json, message):
     if yes:
         return
@@ -273,14 +294,29 @@ def templates_group():
 @click.option('--idc-name')
 @command_options
 def templates_list(client, as_json, idc_name):
-    emit(client, client.pages('/templates', idc_selection(idc_name)), as_json)
+    value = client.pages('/templates', idc_selection(idc_name))
+    if as_json:
+        emit(client, value, True)
+    else:
+        human_table(client, value, [('name', 'name'), ('status', 'latest_build_status'),
+                                   ('product', 'product'), ('idc', 'idc_name'), ('id', 'id')],
+                    'No templates.')
 
 
 @templates_group.command('get')
 @click.argument('template_id')
 @command_options
 def templates_get(client, as_json, template_id):
-    emit(client, client.data('GET', f'/templates/{component(template_id)}'), as_json)
+    value = client.data('GET', f'/templates/{component(template_id)}')
+    if as_json:
+        emit(client, value, True)
+    else:
+        resources = value.get('resources') or {}
+        human_details(client, [('name', value.get('name')), ('id', value.get('id')),
+                               ('status', value.get('latest_build_status')), ('product', value.get('product')),
+                               ('vcpu', resources.get('vcpu', resources.get('cpu_count'))),
+                               ('memory_mb', resources.get('memory_mb')), ('idc', value.get('idc_name')),
+                               ('created', value.get('created_at'))])
 
 
 @templates_group.command('create')
@@ -297,10 +333,19 @@ def templates_get(client, as_json, template_id):
 def templates_create(client, as_json, name, image, product, cmd, start_cmd, idc_name, wait, timeout, yes):
     client.estimate(idc_name, product)
     confirm(yes, as_json, 'Create a template and build its image?')
+    started = time.monotonic()
     value = client.create_template(name, image, product, cmd, start_cmd, idc_name)
     if wait:
-        value = client.wait_template(value['id'], timeout)
-    emit(client, value, as_json)
+        progress = None if as_json else lambda: click.echo(f'building {int(time.monotonic() - started)}s')
+        value = client.wait_template(value['id'], timeout, progress=progress)
+    if as_json:
+        emit(client, value, True)
+    else:
+        identity = f"{human_field(client, value.get('name', name))} ({human_field(client, value['id'])})"
+        if wait:
+            click.echo(f"ready: {identity} product {human_field(client, value.get('product', product))} in {int(time.monotonic() - started)}s")
+        else:
+            click.echo(f'created: {identity}, build started')
 
 
 @templates_group.command('delete')
@@ -373,7 +418,12 @@ def sandbox_list(client, as_json, state, idc_name):
     params = idc_selection(idc_name)
     if state:
         params['state'] = state
-    emit(client, client.pages('/sandboxes', params), as_json)
+    value = client.pages('/sandboxes', params)
+    if as_json:
+        emit(client, value, True)
+    else:
+        human_table(client, value, [('id', 'id'), ('state', 'state'), ('product', 'product'),
+                                   ('idc', 'idc_name'), ('ends', 'end_at')], 'No sandboxes.')
 
 
 @sandbox_group.command('get')
@@ -381,8 +431,17 @@ def sandbox_list(client, as_json, state, idc_name):
 @command_options
 def sandbox_get(client, as_json, sandbox_id):
     value = client.data('GET', f'/sandboxes/{component(sandbox_id)}')
+    if not as_json:
+        fields = [('id', value.get('id')), ('state', value.get('state')), ('product', value.get('product')),
+                  ('idc', value.get('idc_name')), ('started', value.get('started_at')), ('ends', value.get('end_at'))]
+        deletion = value.get('deletion') or {}
+        if deletion:
+            fields.extend((label, deletion.get(key)) for label, key in
+                          [('deletion code', 'code'), ('deletion message', 'message'), ('initiator', 'initiator')])
+        human_details(client, fields)
     client.check_deletion(value)
-    emit(client, value, as_json)
+    if as_json:
+        emit(client, value, True)
 
 
 @sandbox_group.command('kill')
