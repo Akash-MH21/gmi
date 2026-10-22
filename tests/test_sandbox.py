@@ -52,6 +52,9 @@ class FakeCloud:
         self.products = [{'product': 'gmi.sandbox.small', 'status': 'active',
                           'resources': {'vcpu': 2, 'memory_mb': 4096}}]
         self.templates = []
+        self.template_detail = {}
+        self.sandboxes = [{'id': 'box', 'state': 'running'}]
+        self.sandbox_detail = {}
         self.execution_pending = False
 
     def handler(self, request):
@@ -100,7 +103,8 @@ class FakeCloud:
             if request.method == 'DELETE':
                 return httpx.Response(202, json={'data': {'id': 'template', 'deleted': True}})
             state = self.build_states.pop(0) if len(self.build_states) > 1 else self.build_states[0]
-            return httpx.Response(200, json={'data': {'id': 'template', 'latest_build_id': 'build', 'latest_build_status': state}})
+            return httpx.Response(200, json={'data': {'id': 'template', 'latest_build_id': 'build',
+                                                    'latest_build_status': state, **self.template_detail}})
         if path.endswith('/builds/build/logs'):
             offset = int(request.url.params['offset'])
             return httpx.Response(200, json={'data': {'entries': [{'message': f'line {offset}'}],
@@ -111,7 +115,7 @@ class FakeCloud:
                                                     'failure': {'code': 'Build.Error', 'message': 'package installation failed'}}})
         if path.endswith('/sandboxes'):
             if request.method == 'GET':
-                return httpx.Response(200, json={'items': [{'id': 'box', 'state': 'running'}], 'total': 1})
+                return httpx.Response(200, json={'items': self.sandboxes, 'total': len(self.sandboxes)})
             body = json.loads(request.content)
             assert body['template_id'] == 'template'
             assert request.headers['Idempotency-Key']
@@ -130,6 +134,7 @@ class FakeCloud:
             detail = {'id': 'box', 'state': state, 'end_at': '2026-10-22T12:05:00Z',
                       'sandbox_access_token': ACCESS, 'traffic_access_token': TRAFFIC,
                       'metadata': {'echo': ACCESS, 'traffic_access_token': TRAFFIC}}
+            detail.update(self.sandbox_detail)
             if state in ('deleted', 'deleting'):
                 detail['deletion'] = {'code': 'Sandbox.BillingNoPermission', 'initiator': 'billing',
                                       'message': 'Deleted by platform: billing is not permitted'}
@@ -455,3 +460,167 @@ def test_default_idc_creation_survives_catalog_requiring_idc(cloud, monkeypatch)
     result = invoke(['create', 'template', '--yes', '--wait'])
     assert_ok(result)
     assert 'catalog prices are unavailable' in result.stderr
+
+
+TEMPLATE = {
+    'name': 'demo', 'product': 'gmi.sandbox.small', 'idc_name': 'us-central-iowa16',
+    'resources': {'cpu_count': 2, 'memory_mb': 4096}, 'created_at': '2026-10-22T12:00:00Z',
+}
+BOX = {
+    'product': 'gmi.sandbox.small', 'idc_name': 'us-central-iowa16',
+    'started_at': '2026-10-22T12:00:00Z', 'end_at': '2026-10-22T12:05:00Z',
+}
+TEMPLATE_LIST_OUTPUT = (
+    'name\tstatus\tproduct\tidc\tid\n'
+    'demo\tready\tgmi.sandbox.small\tus-central-iowa16\ttemplate\n'
+)
+TEMPLATE_GET_OUTPUT = (
+    'name: demo\nid: template\nstatus: ready\nproduct: gmi.sandbox.small\n'
+    'vcpu: 2\nmemory_mb: 4096\nidc: us-central-iowa16\ncreated: 2026-10-22T12:00:00Z\n'
+)
+TEMPLATE_CREATE_OUTPUT = 'created: demo (template), build started\n'
+TEMPLATE_WAIT_OUTPUT = (
+    'building 0s\nbuilding 5s\nbuilding 10s\n'
+    'ready: demo (template) product gmi.sandbox.small in 17s\n'
+)
+SANDBOX_LIST_OUTPUT = (
+    'id\tstate\tproduct\tidc\tends\n'
+    'box\trunning\tgmi.sandbox.small\tus-central-iowa16\t2026-10-22T12:05:00Z\n'
+)
+SANDBOX_GET_OUTPUT = (
+    'id: box\nstate: running\nproduct: gmi.sandbox.small\nidc: us-central-iowa16\n'
+    'started: 2026-10-22T12:00:00Z\nends: 2026-10-22T12:05:00Z\n'
+)
+
+
+@pytest.fixture
+def display_cloud(cloud):
+    cloud.template_detail = dict(TEMPLATE)
+    cloud.templates = [{'id': 'template', 'latest_build_status': 'ready', **TEMPLATE,
+                        'sandbox_access_token': ACCESS, 'traffic_access_token': TRAFFIC}]
+    cloud.sandbox_detail = dict(BOX)
+    cloud.sandboxes = [{'id': 'box', 'state': 'running', **BOX,
+                        'sandbox_access_token': ACCESS, 'traffic_access_token': TRAFFIC}]
+    return cloud
+
+
+@pytest.mark.parametrize('command,expected', [
+    (['templates', 'list'], TEMPLATE_LIST_OUTPUT),
+    (['templates', 'get', 'template'], TEMPLATE_GET_OUTPUT),
+    (['templates', 'create', '--name', 'demo', '--yes'], TEMPLATE_CREATE_OUTPUT),
+    (['list'], SANDBOX_LIST_OUTPUT),
+    (['get', 'box'], SANDBOX_GET_OUTPUT),
+])
+def test_exact_human_output(display_cloud, command, expected):
+    result = invoke(command)
+    assert_ok(result)
+    assert result.stdout == expected
+    if 'get' in command:
+        assert len(result.stdout.splitlines()) <= 10
+    assert all(secret not in result.stdout + result.stderr for secret in (COMPUTE, ACCESS, TRAFFIC))
+    assert 'sandbox_access_token' not in result.stdout
+    assert 'traffic_access_token' not in result.stdout
+
+
+@pytest.mark.parametrize('as_json', [False, True])
+def test_template_wait_output_and_poll_interval(display_cloud, monkeypatch, as_json):
+    cloud = display_cloud
+    cloud.build_states = ['building', 'building', 'building', 'ready']
+    elapsed = [0]
+    sleeps = []
+    def sleep(seconds):
+        sleeps.append(seconds)
+        elapsed[0] += seconds
+    handler = cloud.handler
+    def delayed_ready(request):
+        response = handler(request)
+        if request.url.path.endswith('/templates/template') and response.json()['data']['latest_build_status'] == 'ready':
+            elapsed[0] += 2
+        return response
+    monkeypatch.setattr(sandbox.time, 'monotonic', lambda: elapsed[0])
+    monkeypatch.setattr(sandbox.time, 'sleep', sleep)
+    monkeypatch.setattr(sandbox, 'HTTPTransport', lambda: httpx.MockTransport(delayed_ready))
+    result = invoke(['templates', 'create', '--name', 'demo', '--wait', '--yes', *(['--json'] if as_json else [])])
+    assert_ok(result)
+    assert sleeps == [5, 5, 5]
+    expected = (json.dumps({'id': 'template', 'latest_build_id': 'build', 'latest_build_status': 'ready', **TEMPLATE}) + '\n'
+                if as_json else TEMPLATE_WAIT_OUTPUT)
+    assert result.stdout == expected
+    assert all(secret not in result.stdout + result.stderr for secret in (COMPUTE, ACCESS, TRAFFIC))
+
+
+@pytest.mark.parametrize('command,expected', [
+    (['templates', 'list'], 'No templates.\n'), (['list'], 'No sandboxes.\n'),
+])
+def test_empty_human_lists(cloud, command, expected):
+    cloud.sandboxes = []
+    result = invoke(command)
+    assert_ok(result)
+    assert result.stdout == expected
+    result = invoke([*command, '--json'])
+    assert_ok(result)
+    assert result.stdout == '[]\n'
+
+
+def test_template_list_preserves_api_order_and_full_ids(display_cloud):
+    display_cloud.templates[0]['id'] = 'ffffffff-ffff-ffff-ffff-ffffffffffff'
+    display_cloud.templates.append({**display_cloud.templates[0], 'name': 'alpha',
+                                    'id': 'aaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa', 'latest_build_status': 'building'})
+    result = invoke(['templates', 'list'])
+    assert_ok(result)
+    assert result.stdout == (
+        'name\tstatus\tproduct\tidc\tid\n'
+        'demo\tready\tgmi.sandbox.small\tus-central-iowa16\tffffffff-ffff-ffff-ffff-ffffffffffff\n'
+        'alpha\tbuilding\tgmi.sandbox.small\tus-central-iowa16\taaaaaaaa-aaaa-aaaa-aaaa-aaaaaaaaaaaa\n'
+    )
+
+
+@pytest.mark.parametrize('state', ['deleting', 'deleted'])
+def test_deleted_get_block(display_cloud, state):
+    display_cloud.states = [state]
+    result = invoke(['get', 'box'])
+    assert result.exit_code == 1
+    assert result.stdout == SANDBOX_GET_OUTPUT.replace('state: running', f'state: {state}') + (
+        'deletion code: Sandbox.BillingNoPermission\n'
+        'deletion message: Deleted by platform: billing is not permitted\n'
+        'initiator: billing\n'
+    )
+    assert len(result.stdout.splitlines()) <= 10
+    assert 'not a gmi error' in result.stderr
+    assert all(secret not in result.stdout + result.stderr for secret in (COMPUTE, ACCESS, TRAFFIC))
+    # JSON keeps the pre-existing deletion error and empty stdout.
+    result = invoke(['get', 'box', '--json'])
+    assert result.exit_code == 1
+    assert result.stdout == ''
+
+
+@pytest.mark.parametrize('command,payload', [
+    (['templates', 'list'], [{'id': 'template', 'latest_build_status': 'ready', **TEMPLATE,
+                             'sandbox_access_token': '[redacted]', 'traffic_access_token': '[redacted]'}]),
+    (['templates', 'get', 'template'], {'id': 'template', 'latest_build_id': 'build', 'latest_build_status': 'ready', **TEMPLATE}),
+    (['templates', 'create', '--name', 'demo', '--yes'], {'id': 'template', 'build_id': 'build', 'status': 'waiting'}),
+    (['templates', 'create', '--name', 'demo', '--wait', '--yes'],
+     {'id': 'template', 'latest_build_id': 'build', 'latest_build_status': 'ready', **TEMPLATE}),
+    (['list'], [{'id': 'box', 'state': 'running', **BOX,
+                'sandbox_access_token': '[redacted]', 'traffic_access_token': '[redacted]'}]),
+    (['get', 'box'], {'id': 'box', 'state': 'running', 'end_at': BOX['end_at'],
+                     'sandbox_access_token': '[redacted]', 'traffic_access_token': '[redacted]',
+                     'metadata': {'echo': '[redacted]', 'traffic_access_token': '[redacted]'},
+                     'product': BOX['product'], 'idc_name': BOX['idc_name'], 'started_at': BOX['started_at']}),
+])
+def test_json_bytes_unchanged(display_cloud, command, payload):
+    result = invoke([*command, '--json'])
+    assert_ok(result)
+    assert result.stdout.encode() == (json.dumps(payload, ensure_ascii=False) + '\n').encode()
+    assert all(secret not in result.stdout + result.stderr for secret in (COMPUTE, ACCESS, TRAFFIC))
+
+
+def test_human_fields_redact_embedded_tokens_and_keep_single_lines(display_cloud):
+    display_cloud.template_detail.update({'name': 'demo\n' + ACCESS, 'traffic_access_token': ACCESS})
+    display_cloud.sandbox_detail.update({'product': 'sku\n' + TRAFFIC})
+    for command in (['templates', 'get', 'template'], ['get', 'box']):
+        result = invoke(command)
+        assert_ok(result)
+        assert len(result.stdout.splitlines()) <= 10
+        assert '[redacted]' in result.stdout
+        assert all(secret not in result.stdout + result.stderr for secret in (COMPUTE, ACCESS, TRAFFIC))
