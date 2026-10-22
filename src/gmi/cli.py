@@ -215,7 +215,7 @@ def config():
 
 
 @config.command("get")
-@click.argument("name", type=click.Choice(["default_model", "default_image_model", "default_video_model", "default_audio_model"]))
+@click.argument("name", type=click.Choice(["default_model", "default_image_model", "default_video_model", "default_audio_model", "sandbox_idc"]))
 @options
 def config_get(api_key, as_json, name):
     """Print a setting."""
@@ -227,7 +227,7 @@ def config_get(api_key, as_json, name):
 
 
 @config.command("set")
-@click.argument("name", type=click.Choice(["default_model", "default_image_model", "default_video_model", "default_audio_model"]))
+@click.argument("name", type=click.Choice(["default_model", "default_image_model", "default_video_model", "default_audio_model", "sandbox_idc"]))
 @click.argument("value")
 @options
 def config_set(api_key, as_json, name, value):
@@ -396,3 +396,6 @@ def chat(api_key, as_json, prompt, no_stream, model, system, max_tokens, no_retr
 # Click needs to resolve a subcommand under ``gmi api``.
 from .api_commands import api_group
 main.add_command(api_group)
+
+from .sandbox import sandbox_group
+main.add_command(sandbox_group)

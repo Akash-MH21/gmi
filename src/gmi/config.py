@@ -33,7 +33,7 @@ def read_config():
         key = values.get("api_key")
         if key is not None and not isinstance(key, str):
             raise GMIError("Invalid config; run gmi auth login --stdin to replace it.")
-        for name in ("default_model", "default_image_model", "default_video_model", "default_audio_model"):
+        for name in ("default_model", "default_image_model", "default_video_model", "default_audio_model", "sandbox_idc"):
             value = values.get(name)
             if value is not None and not isinstance(value, str):
                 raise GMIError(f"Invalid config; run gmi config set {name} <id> to replace it.")
@@ -80,7 +80,7 @@ def save_config(api_key=None, default_model=None, unset_default=False, **setting
         path.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
         fd, temporary = tempfile.mkstemp(dir=path.parent, prefix=".config-")
         with os.fdopen(fd, "w", encoding="utf-8") as handle:
-            for name in ("api_key", "default_model", "default_image_model", "default_video_model", "default_audio_model"):
+            for name in ("api_key", "default_model", "default_image_model", "default_video_model", "default_audio_model", "sandbox_idc"):
                 if name in current:
                     # JSON string escaping is compatible with TOML basic strings.
                     handle.write(name + " = " + json.dumps(current[name], ensure_ascii=False) + "\n")

@@ -5,6 +5,8 @@ from urllib.parse import quote, urlencode
 import click, httpx
 from .config import GMIError, mask_key, resolve_key, read_key
 
+COMPUTE_HINT = " Set GMI_COMPUTE_API_KEY or GMI_SANDBOX_API_KEY to a console API key with compute scope; see gmi api check."
+
 _MANIFEST = None
 def manifest():
     global _MANIFEST
@@ -202,7 +204,7 @@ def _request(o, path_values, query, headers, data, sets, token, access_token, ho
     if response.status_code >= 400:
         try: payload=response.json(); msg=payload.get("message") or payload.get("error") or payload
         except Exception: msg=response.text[:200]
-        extra = " Set GMI_COMPUTE_API_KEY or GMI_SANDBOX_API_KEY to a console API key with compute scope; see gmi api check." if response.status_code == 401 and o["service"] in ("sandbox", "cluster") else ""
+        extra = COMPUTE_HINT if response.status_code in (401, 403) and o["service"] in ("sandbox", "cluster") else ""
         raise click.ClickException(f"HTTP {response.status_code}: {msg}{extra}")
     if o.get("returns_binary"):
         if not output: raise click.ClickException("This operation returns binary data; use --out FILE")
