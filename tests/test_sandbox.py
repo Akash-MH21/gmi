@@ -128,7 +128,8 @@ class FakeCloud:
                 return httpx.Response(202, json={'data': {'id': 'box', 'state': 'deleting'}})
             state = self.states.pop(0) if len(self.states) > 1 else self.states[0]
             detail = {'id': 'box', 'state': state, 'end_at': '2026-10-22T12:05:00Z',
-                      'sandbox_access_token': ACCESS, 'traffic_access_token': TRAFFIC}
+                      'sandbox_access_token': ACCESS, 'traffic_access_token': TRAFFIC,
+                      'metadata': {'echo': ACCESS, 'traffic_access_token': TRAFFIC}}
             if state in ('deleted', 'deleting'):
                 detail['deletion'] = {'code': 'Sandbox.BillingNoPermission', 'initiator': 'billing',
                                       'message': 'Deleted by platform: billing is not permitted'}

@@ -51,14 +51,21 @@ class SandboxClient:
 
     def scrub(self, value, show_token=False):
         if isinstance(value, dict):
-            return {k: (self.scrub(v, show_token) if show_token and k in ('sandbox_access_token', 'traffic_access_token')
-                        else '[redacted]' if 'token' in k.lower() or 'api_key' in k.lower()
-                        else self.scrub(v, show_token)) for k, v in value.items()}
+            result = {}
+            for key, item in value.items():
+                if show_token and key in ('sandbox_access_token', 'traffic_access_token') and isinstance(item, str):
+                    # Reveal only these top-level fields, never echoed tokens elsewhere.
+                    result[key] = item.replace(self.key, '[redacted]')
+                elif 'token' in key.lower() or 'api_key' in key.lower():
+                    result[key] = '[redacted]'
+                else:
+                    result[key] = self.scrub(item)
+            return result
         if isinstance(value, list):
-            return [self.scrub(v, show_token) for v in value]
+            return [self.scrub(item) for item in value]
         if isinstance(value, str):
             for secret in sorted(self.secrets, key=len, reverse=True):
-                if secret and (not show_token or secret == self.key):
+                if secret:
                     value = value.replace(secret, '[redacted]')
         return value
 

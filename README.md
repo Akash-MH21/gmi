@@ -45,7 +45,7 @@ GMI Cloud has an OpenAI-compatible API, a Model Hub and a web console. `gmi` add
 - **Careful with your key.** Hidden prompt, verified before it is saved, stored with mode 600, never printed.
 
 > [!NOTE]
-> **Status: Day 3 of a six-day public build (20 to 25 Oct 2026).** What is in this README works today and was run against the live API. What is not built yet is listed in the [roadmap](#roadmap) and is not described anywhere else in this file.
+> **Status: Day 4 of a six-day public build (20 to 25 Oct 2026).** Days 1 to 3 include live API verification. Day 4 adds AgentBox commands and an HTTP service tested offline. Sandbox data plane operations are unverified live and marketplace publication is pending. See the [roadmap](#roadmap) for scope and verification limits.
 
 ## Install
 
@@ -182,7 +182,7 @@ gmi models --json | jq -r '.data[] | select((.pricing.prompt|tonumber) < 0.00000
 - `gmi auth status` shows the masked key and checks that the API is reachable.
 - `gmi auth logout` removes the saved key. `--yes` skips the confirmation. A key in `GMI_API_KEY` stays active.
 
-**`gmi config get|set KEY [VALUE]`**: read or save a default. Keys: `default_model` (chat), `default_image_model`, `default_video_model` and `default_audio_model`.
+**`gmi config get|set KEY [VALUE]`**: read or save a default. Keys: `default_model` (chat), `default_image_model`, `default_video_model`, `default_audio_model` and `sandbox_idc`.
 
 **Global options** (before any command): `--version`, `--api-key TEXT`, `--json`, `--help`.
 
@@ -374,6 +374,78 @@ $ gmi api cluster baremetals delete-baremetal demo-id --dry-run --token session_
 Every non-GET asks for confirmation. DELETE also says `This deletes data.`. Use `--yes` for an intentional noninteractive call. `--dry-run` works without a key and sends nothing. Binary responses require `--out FILE`.
 
 
+## `gmi sandbox`: AgentBox
+
+Day 4 adds friendly control plane commands for products, templates, sandbox
+creation, inspection, lifetime changes and deletion. Exec, file transfer and
+one-shot runs implement the published data plane contract and are **unverified
+live**. All Day 4 tests are offline. See [the AgentBox guide](docs/AGENTBOX.md)
+for the full command reference and known platform billing deletion.
+
+Use a compute-scope key in `GMI_COMPUTE_API_KEY` or `GMI_SANDBOX_API_KEY`.
+The normal inference key cannot authorize these operations. IDC precedence is
+`--idc-name`, `GMI_SANDBOX_IDC_NAME`, then `gmi config set sandbox_idc NAME`.
+Without a selection, creation omits the field and uses the organization's default.
+
+```sh
+gmi sandbox products --idc-name us-central-iowa16
+gmi sandbox templates create --name demo --image ubuntu:24.04 \
+  --start-cmd 'sleep infinity' --idc-name us-central-iowa16 --wait --yes
+gmi sandbox create TEMPLATE_ID --timeout 300 --wait --yes
+gmi sandbox list --json
+gmi sandbox exec SANDBOX_ID -- sh -c 'printf "hello\n"'
+gmi sandbox put SANDBOX_ID ./input.txt /home/user/input.txt
+gmi sandbox get-file SANDBOX_ID /home/user/input.txt --out ./output.txt
+gmi sandbox timeout SANDBOX_ID 900 --yes
+gmi sandbox kill SANDBOX_ID --yes
+gmi sandbox run --image ubuntu:24.04 --yes -- uname -a
+```
+
+These are usage examples, not live execution results. The owner verified
+`us-central-iowa16` and `us-central-iowa2` for this organization. Custom resources
+are disabled by the platform. Creation and deletion require confirmation;
+`--yes` is required in scripts or with `--json`. Catalog prices appear only when
+the response supplies them. Otherwise gmi explains per-second runtime billing
+and credits where applicable without inventing a price.
+
+Creation prints the ID and end time. Access and traffic tokens are masked by
+default, including in JSON. Only `sandbox create --show-token` reveals them once
+with a secret warning. Exec and file operations connect for fresh tokens and send
+only `X-Access-Token` to the sandbox host. Exec returns the process exit code.
+`run` reuses a matching ready template or builds one, creates and waits for a
+sandbox, executes the command and attempts to kill it even on failure or Ctrl+C.
+
+The owner observed immediate platform deletion with
+`Sandbox.BillingNoPermission`, initiated by `billing`. gmi stops at the first
+response showing deletion and reports the message, code and initiator with a
+non-zero exit. It says this is not a gmi error. This path is tested offline;
+live exec and file transfer remain blocked by the organization's purchase
+permission. Marketplace publication is pending.
+
+## `gmi serve`: HTTP chat service
+
+`gmi serve` listens on `0.0.0.0:$PORT`, default 8080. `GET /health` returns
+`{"status":"ok"}`. `POST /chat` accepts `{"message":"Hello","model":"optional/model"}`
+and returns `{"model":"...","reply":"...","usage":{...}}`.
+
+On AgentBox, GMI injects `GMI_MAAS_BASE_URL` and `GMI_MAAS_API_KEY` for inference.
+For local use the key falls back to `GMI_API_KEY` and the base defaults to
+`https://api.gmi-serving.com`. The request model overrides the first model in
+`GMI_MODELS`, then the default is `openai/gpt-6.1-sol`. The service appends `/v1`
+to a base without it and sends non-streaming chat completions.
+
+Set `GMI_SERVE_TOKEN` to require its bearer token on every route except `/health`.
+**Without it the service is open to anyone who can reach it**, allowing calls
+billed to the configured account. The AgentBox gateway's own access control is
+unverified here. Runtime credentials are never logged or returned.
+
+The service rejects bad JSON with 400 and bodies above 64 KB with 413. Upstream
+errors return 502 with a short message and use a 30 second timeout. Offline tests
+call the service through HTTP with a local fake upstream. Live MaaS injection
+and deployment remain unverified. The Dockerfile runs as a non-root user with a
+health check. Image build, push and the five marketplace wizard steps are in
+[docs/AGENTBOX.md](docs/AGENTBOX.md); none has been performed in this build.
+
 ## Configuration and privacy
 
 | Path | Contents |
@@ -425,7 +497,7 @@ Built in public, one working piece a day. The rule: nothing gets announced until
 | 1 | Tue 20 Oct | The interactive session, `gmi models`, `gmi chat`, login and config | **Shipped** |
 | 2 | Wed 21 Oct | `/image`, `/video` and `/audio` in the session, plus scriptable commands | **Shipped** |
 | 3 | Thu 22 Oct | Commands generated from GMI's four published OpenAPI specs | **Shipped** |
-| 4 | Fri 23 Oct | `gmi sandbox` (AgentBox), then `gmi` itself on the AgentBox marketplace | Planned |
+| 4 | Fri 23 Oct | `gmi sandbox` and `gmi serve` | **Shipped: offline contracts and service tests.** Sandbox data plane unverified live. Docker and marketplace publication unverified. |
 | 5 | Sat 24 Oct | `gmi mcp serve`: every operation as an MCP tool for your agents | Planned |
 | 6 | Sun 25 Oct | v1.0: docs, install one-liner, good first issues | Planned |
 
@@ -433,7 +505,7 @@ Some of the GMI APIs need a different kind of API key than the inference key gmi
 
 ## How it's built
 
-Every line of code in this repository is written by [Codex CLI](https://github.com/openai/codex) running **`openai/gpt-6.1-sol` on GMI Cloud**, the same API gmi talks to. [`AGENTS.md`](AGENTS.md) is the contract it works from: the schedule, the verified API facts and the rules. Changes are run against the live API before they ship. The tests drive the real interactive app through a pseudo-terminal.
+Every line of code in this repository is written by [Codex CLI](https://github.com/openai/codex) running **`openai/gpt-6.1-sol` on GMI Cloud**, the same API gmi talks to. [`AGENTS.md`](AGENTS.md) is the contract it works from: the schedule, the verified API facts and the rules. Days 1 to 3 include live API checks. Day 4 has offline contract tests with live limits documented above. The interactive app tests use a pseudo-terminal.
 
 ## Development
 
@@ -442,7 +514,7 @@ git clone https://github.com/zkasuran/gmi && cd gmi
 python3 -m venv .venv && source .venv/bin/activate
 pip install -e ".[test]"
 
-pytest -m "not live"      # offline unit tests, no key needed
+pytest -m "not live and not live_media"  # offline tests, no key needed
 GMI_API_KEY=... pytest    # everything, including live tests against the real API
 ```
 

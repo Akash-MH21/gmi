@@ -22,7 +22,7 @@ The full plan, all committed:
 5. `gmi mcp serve` (every operation as an MCP tool) and `gmi mcp login` to `mcp.gmicloud.ai/mcp`.
 6. Published as an agent on the AgentBox marketplace.
 
-## Schedule (what must work, and by when)
+## Schedule (what must work and by when)
 
 Posts for a day are due ~12 hours before that day starts, so each day's build must
 be finished the day before.
@@ -38,8 +38,8 @@ be finished the day before.
 
 ## Verified facts about the GMI APIs (checked 2026-10-21)
 
-- The vendored specs contain 93 operations: iam 30 (6 GET, 14 POST, 6 PATCH, 4 DELETE), idc 1 (1 GET), sandbox 21 (10 GET, 7 POST, 2 PATCH, 2 DELETE), and cluster 41 (18 GET, 13 POST, 4 PUT, 6 DELETE). Operation IDs exist for 90 operations. Tags are iam {invitations, me, oauth, organizations, users}, idc {idcs}, sandbox {Sandbox, Sandbox-Exec, Sandbox-Files, SandboxTemplate}, and cluster {baremetals, containers, elastic-ips, firewalls, images, logs, templates, vpcs}.
-- Servers are iam and idc `https://console.gmicloud.ai/api/v1`, sandbox `https://console.gmicloud.ai/api/v2`, and cluster `https://console.gmicloud.ai/api`. Eight operations have no auth, 77 use `bearerAuth`, one uses `bearerAPIKey`, two use `bearerEmailVerificationToken`, and five sandbox data-plane operations use `sandboxAccessToken` in `X-Access-Token`. The inference key with scope `ie_model` is rejected by Sandbox and Cluster. Those services use a compute-scope key. Cluster write operations and operations that create GPU compute are untested and are not provisioned for this account.
+- The vendored specs contain 93 operations: iam 30 (6 GET, 14 POST, 6 PATCH, 4 DELETE), idc 1 (1 GET), sandbox 21 (10 GET, 7 POST, 2 PATCH, 2 DELETE) and cluster 41 (18 GET, 13 POST, 4 PUT, 6 DELETE). Operation IDs exist for 90 operations. Tags are iam {invitations, me, oauth, organizations, users}, idc {idcs}, sandbox {Sandbox, Sandbox-Exec, Sandbox-Files, SandboxTemplate} and cluster {baremetals, containers, elastic-ips, firewalls, images, logs, templates, vpcs}.
+- Servers are iam and idc `https://console.gmicloud.ai/api/v1`, sandbox `https://console.gmicloud.ai/api/v2` and cluster `https://console.gmicloud.ai/api`. Eight operations have no auth, 77 use `bearerAuth`, one uses `bearerAPIKey`, two use `bearerEmailVerificationToken` and five sandbox data-plane operations use `sandboxAccessToken` in `X-Access-Token`. The inference key with scope `ie_model` is rejected by Sandbox and Cluster. Those services use a compute-scope key. Cluster write operations and operations that create GPU compute are untested and are not provisioned for this account.
 
 - Inference is OpenAI-compatible. Base URL `https://api.gmi-serving.com/v1`.
   Auth: `Authorization: Bearer <API key>`. Chat: `POST /v1/chat/completions`
@@ -59,6 +59,30 @@ be finished the day before.
   a per-sandbox `X-Access-Token` for its data plane. The Cluster Engine spec declares session-token auth only.
   Whether an API key works there is still an open question with GMI.
 
+## AgentBox facts (owner verified live on 2026-10-22)
+
+- Sandbox control plane auth uses a compute-scope key in `Authorization: Bearer`.
+  Reuse the Day 3 resolver for `GMI_COMPUTE_API_KEY` or `GMI_SANDBOX_API_KEY`.
+  Data plane auth uses the sandbox's `X-Access-Token`, never the compute key.
+  `/sandboxes/{id}/connect` returns fresh host and token values; overwrite cached values.
+- This organization's IDCs are `us-central-iowa16` and `us-central-iowa2`.
+  `gmi-sandbox-us` does not exist. IDC selection is flag, environment, config then
+  omission for the organization default. In iowa16 the small, medium and large
+  presets were active. Custom template resources are temporarily disabled.
+- Template builds took 17 to 106 seconds. Poll every five seconds and stop on
+  `ready` or `error`. Surface the build failure message. Template deletion is
+  asynchronous and deleted templates can remain briefly in listings.
+- The platform deleted every sandbox about one second after creation with state
+  `deleting` then `deleted`. The deletion code was `Sandbox.BillingNoPermission`,
+  initiator `billing` and message `Deleted by the platform: billing order could
+  not be created because the organization is not permitted to purchase this product`.
+  Stop on the first deletion response, report its message, code and initiator,
+  exit non-zero and say this is not a gmi error. Never keep polling a deleted sandbox.
+- The data plane could not be reached live. Exec and files remain unverified live.
+  Day 4 implementation tests are offline only by owner instruction. No compute
+  key was available to this build and none was requested. Docker build, push,
+  AgentBox deployment, MaaS injection and marketplace approval are unverified.
+
 ## Media API facts (verified live on 2026-10-20 with real generations)
 
 - Base: `https://console.gmicloud.ai/api/v1/ie/requestqueue/apikey`. Same `Authorization: Bearer <API key>` and
@@ -67,7 +91,7 @@ be finished the day before.
 - `GET /models/{id}` is the real record: `model`, `display_name`, `model_type` (`image`, `video`, `audio`, `3d`,
   `workflow`, `api`, `language`), `status`, `qworkers`, `model_metadata` (`visibility`, `delivery_mode` `sync` or
   `async`), `modalities.input` and `.output` (lists of `{type, required}`), `price_info`
-  `{pricing_type, price, unit}`, and `parameters`.
+  `{pricing_type, price, unit}` and `parameters`.
 - **`price_info.price` is millionths of a USD per `unit`** (per image, per second, per character, per request...).
   Example: 35000 per image is $0.035. Units vary by model, so always show the unit.
 - **A model only runs if `status == "active"` AND `qworkers > 0`.** A model with `qworkers == 0` stays `queued`
@@ -100,7 +124,7 @@ be finished the day before.
 ## The interactive app is the product (project owner, 2026-10-18)
 
 Running `gmi` with no arguments opens an interactive session in the terminal, the way Claude Code,
-Codex CLI or kiro-cli work: you stay in it, type messages, and steer it with slash commands. The
+Codex CLI or kiro-cli work: you stay in it, type messages and steer it with slash commands. The
 subcommands (`gmi chat "..."`, `gmi models --json`, ...) stay for scripts and CI, but the session is
 what people see first and what the demos show.
 
@@ -110,11 +134,11 @@ what people see first and what the demos show.
   the builder config and is not something the code controls.
 - **The product:** `gmi` supports every model GMI Cloud serves through its API: text, image, video, audio
   and anything else in the catalogue. Never hard-code a list of allowed models. Read what is available from
-  the API (`GET /v1/models` for text, and the media model listings) and let the user pick any of them.
+  the API (`GET /v1/models` for text and the media model listings) and let the user pick any of them.
 - The built-in default chat model stays `openai/gpt-6.1-sol`. Media commands have sensible per-type defaults
   that the user can override and save with `gmi config set`.
 - Tests: keep live calls tiny and cheap. Chat tests use `openai/gpt-6.1-sol` with `max_tokens` <= 16. Media tests
-  make one small generation per type with the cheapest suitable model, and are marked `live_media` so they
+  make one small generation per type with the cheapest suitable model and are marked `live_media` so they
   can be skipped.
 
 ## Conventions
@@ -145,4 +169,4 @@ what people see first and what the demos show.
 ## How to report back
 
 End every run with: what now works (exact commands), the test command and its result,
-anything unverified, and the next step. Do not claim something works unless you ran it.
+anything unverified and the next step. Do not claim something works unless you ran it.
