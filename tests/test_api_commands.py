@@ -33,3 +33,18 @@ def test_api_check_markdown_option_exists():
     assert result.exit_code == 0
     assert "--idc-name" in result.output
     assert "--markdown" in result.output
+
+
+def test_get_sandbox_dry_run_requires_and_substitutes_id():
+    runner = CliRunner()
+    args = ["api", "sandbox", "get-sandbox"]
+    result = runner.invoke(main, args + ["SOME_ID", "--dry-run", "--token", "fake-key-for-offline-test"])
+    assert result.exit_code == 0, result.output
+    assert json.loads(result.output)["url"].endswith("/sandboxes/SOME_ID")
+    assert "fake-key-for-offline-test" not in result.output
+    missing = runner.invoke(main, args + ["--dry-run", "--token", "fake-key-for-offline-test"])
+    assert missing.exit_code == 2
+    assert "Missing argument 'ID'" in missing.output
+    grouped = runner.invoke(main, ["api", "sandbox", "Sandbox", "get-sandbox", "SOME_ID", "--dry-run"])
+    assert grouped.exit_code == 0, grouped.output
+    assert json.loads(grouped.output)["url"].endswith("/sandboxes/SOME_ID")

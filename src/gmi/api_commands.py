@@ -234,7 +234,13 @@ def register_operations():
         sg=click.Group(service, help=f"{service} API operations")
         for group in sorted({o["group"] for o in _ops(service)}):
             gg=click.Group(group)
-            for o in [x for x in _ops(service) if x["group"]==group]: gg.add_command(_operation_command(o))
+            for o in [x for x in _ops(service) if x["group"]==group]:
+                command = _operation_command(o)
+                gg.add_command(command)
+                # Keep tag groups while allowing the service-level operation form.
+                if command.name in sg.commands:
+                    raise ValueError(f"Duplicate operation name in {service}: {command.name}")
+                sg.add_command(command)
             sg.add_command(gg)
         api_group.add_command(sg)
 
