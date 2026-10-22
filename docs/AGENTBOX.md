@@ -222,3 +222,26 @@ before it could be reached. No new live calls were made in this build.
 .venv/bin/pytest -q -m 'not live and not live_media'
 .venv/bin/python tools/gen_api.py --check
 ```
+
+## Day 4 validation record
+
+On 22 October 2026, the completed implementation at `f7636d3` passed the full
+offline suite twice:
+
+```text
+.venv/bin/pytest -q -m 'not live and not live_media'
+Run 1: 141 passed, 9 deselected
+Run 2: 141 passed, 9 deselected
+
+.venv/bin/python tools/gen_api.py --check
+Exit 0, generated manifest unchanged
+```
+
+This includes 81 new offline cases beyond the previous 60 tests. No new live
+tests were added or run. `git diff --check` also passed. Docker build and push
+were not run. Work stayed on `day4` without a merge or push.
+
+Next: the account owner resolves the platform purchase permission, then validates
+sandbox operations against the live control and data planes. Build and publish
+the image only with registry access and validate MaaS injection before seeking
+marketplace approval.
