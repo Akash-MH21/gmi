@@ -76,6 +76,15 @@ def api_list(service, method, search, as_json):
     for o in rows: click.echo(f"{o['service']}\t{o['group']}\t{o['name']}\t{o['method']}\t{o['path']}\t{o['security_scheme']}")
     click.echo(f"Total: {len(rows)}")
 
+def _check_skip_reasons(operation, idc_name=None):
+    """Use resolved manifest parameters to decide whether a GET can be probed."""
+    reasons = []
+    if operation["method"] != "GET": reasons.append("not a GET")
+    if operation["path_parameters"]: reasons.append("needs a path parameter")
+    if any(p["required"] and not (p["name"] == "idc_name" and idc_name) for p in operation["query_parameters"]):
+        reasons.append("needs a required query parameter")
+    return reasons
+
 @api_group.command("check")
 @click.option("--service", type=click.Choice(["iam","idc","sandbox","cluster"]))
 @click.option("--token")
@@ -87,11 +96,7 @@ def api_check(service, token, idc_name, markdown, as_json):
     token = token or os.environ.get("GMI_TOKEN")
     rows = _ops(service); results=[]; skipped=[]; credentials={}
     for o in rows:
-        reasons=[]
-        if o["method"] != "GET": reasons.append("not a GET")
-        if o["path_parameters"]: reasons.append("needs a path parameter")
-        missing_query = [p for p in o["query_parameters"] if p.get("required") and not (p["name"] == "idc_name" and idc_name)]
-        if missing_query: reasons.append("needs a required query parameter")
+        reasons = _check_skip_reasons(o, idc_name)
         if reasons: skipped.append({"operation":o["name"],"service":o["service"],"reasons":reasons}); continue
         try:
             auth_headers={"User-Agent":"gmi-cli/0.1.0"}
