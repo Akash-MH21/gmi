@@ -40,12 +40,12 @@ gmi config set sandbox_idc us-central-iowa16
 gmi sandbox templates create --name demo --image ubuntu:24.04 \
   --product gmi.sandbox.small --cmd 'mkdir -p /home/user' \
   --start-cmd 'sleep infinity' --wait --timeout 600 --yes
-gmi sandbox templates list --json
+gmi sandbox templates list
 gmi sandbox templates get TEMPLATE_ID
 gmi sandbox templates logs TEMPLATE_ID
 
 gmi sandbox create TEMPLATE_ID --timeout 300 --env APP_ENV=demo --wait --yes
-gmi sandbox list --state running --json
+gmi sandbox list --state running
 gmi sandbox get SANDBOX_ID
 gmi sandbox timeout SANDBOX_ID 900 --yes
 gmi sandbox exec SANDBOX_ID -- sh -c 'printf "hello\n"'
@@ -55,6 +55,48 @@ gmi sandbox kill SANDBOX_ID --yes
 gmi sandbox templates delete TEMPLATE_ID --yes
 
 gmi sandbox run --image ubuntu:24.04 --yes -- uname -a
+```
+
+The following stdout examples use offline test fixtures. Lists use tab-separated
+columns and detail blocks stay within 10 lines. Add `--json` for the existing
+machine-readable output. Template creation with `--wait` prints build progress
+once per poll. Empty lists print `No templates.` or `No sandboxes.`
+
+```text
+$ gmi sandbox templates create --name demo --yes
+created: demo (template), build started
+
+$ gmi sandbox templates create --name demo --wait --yes
+building 0s
+building 5s
+building 10s
+ready: demo (template) product gmi.sandbox.small in 17s
+
+$ gmi sandbox templates list
+name	status	product	idc	id
+demo	ready	gmi.sandbox.small	us-central-iowa16	template
+
+$ gmi sandbox templates get template
+name: demo
+id: template
+status: ready
+product: gmi.sandbox.small
+vcpu: 2
+memory_mb: 4096
+idc: us-central-iowa16
+created: 2026-10-22T12:00:00Z
+
+$ gmi sandbox list
+id	state	product	idc	ends
+box	running	gmi.sandbox.small	us-central-iowa16	2026-10-22T12:05:00Z
+
+$ gmi sandbox get box
+id: box
+state: running
+product: gmi.sandbox.small
+idc: us-central-iowa16
+started: 2026-10-22T12:00:00Z
+ends: 2026-10-22T12:05:00Z
 ```
 
 These are usage examples, not a record of live execution. The image must contain
