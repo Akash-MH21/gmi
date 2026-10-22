@@ -133,6 +133,13 @@ what people see first and what the demos show.
   only when `GMI_API_KEY` is set, call the real API and keep spend tiny (`max_tokens` <= 16).
 - Style: plain, specific English in help text and docs. No em or en dashes anywhere.
 - Generate the API manifest with `python tools/gen_api.py`; verify it with `python tools/gen_api.py --check`.
+  Resolve local references recursively for parameters, request bodies and schemas with a cycle guard.
+  Merge path-level and operation parameters by name and location with the operation taking precedence.
+  Offline invariants compare every operation with the vendored specs: path placeholders must match
+  path parameters, parameter names and locations must be present, types default to string and required
+  flags must be preserved. The manifest must contain no unresolved references.
+  `gmi api check` skips operations with path parameters or missing required query parameters.
+  Only the required `idc_name` query can be supplied through `--idc-name` or `GMI_SANDBOX_IDC_NAME`.
 - Licence Apache-2.0. Git author `zkasuran <289388318+zkasuran@users.noreply.github.com>`.
 
 ## How to report back

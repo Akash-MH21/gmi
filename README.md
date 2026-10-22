@@ -280,6 +280,16 @@ seedance-1-0-pro-fast-251015 success (27s)
 
 Day 3 generates a command for every operation in the four vendored OpenAPI specs. Run `gmi api check --markdown docs/API-COVERAGE.md` with the keys available to your account and see the current results in [docs/API-COVERAGE.md](docs/API-COVERAGE.md).
 
+The generator resolves local references for parameters, request bodies and response schemas. Operation parameters override path-level parameters with the same name and location. Path parameters become required positional arguments. Preview a request without sending it:
+
+```sh
+gmi api sandbox get-sandbox SOME_ID --dry-run
+```
+
+This prints a URL ending in `/sandboxes/SOME_ID`. Omitting `SOME_ID` is a usage error. The existing tag-group form `gmi api sandbox Sandbox get-sandbox SOME_ID --dry-run` also works.
+
+`gmi api check` skips operations with path parameters with the reason `needs a path parameter`. It also skips operations with missing required query parameters. Supply `idc_name` through `--idc-name` or `GMI_SANDBOX_IDC_NAME`; other required query parameters keep the operation skipped. It probes only GET operations.
+
 | Service | Credential |
 |---|---|
 | IAM and IDC | The normal inference key from `GMI_API_KEY` or saved settings. |
