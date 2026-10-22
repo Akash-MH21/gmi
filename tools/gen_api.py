@@ -15,28 +15,52 @@ def kebab(value):
 
 def schema_type(schema):
     if not schema: return "string"
-    if "$ref" in schema: return schema["$ref"].rsplit("/", 1)[-1]
     return schema.get("type", "string")
 
 def parameter(p, doc=None):
-    if "$ref" in p and doc is not None:
-        p = (doc.get("components", {}).get("parameters", {}).get(p["$ref"].rsplit("/", 1)[-1]) or p)
+    if doc is not None: p = deref(p, doc)
     s = p.get("schema") or {}
-    out = {"name": p.get("name"), "type": schema_type(s), "required": bool(p.get("required"))}
+    out = {"name": p["name"], "in": p["in"], "type": schema_type(s), "required": bool(p.get("required"))}
     if "enum" in s: out["enum"] = s["enum"]
     if "default" in s: out["default"] = s["default"]
     return out
 
-def deref(schema, doc):
-    if isinstance(schema, dict) and "$ref" in schema:
-        return (doc.get("components", {}).get("schemas", {}).get(schema["$ref"].rsplit("/", 1)[-1]) or {})
-    return schema or {}
+def deref(value, doc, active=frozenset()):
+    """Resolve local JSON pointers recursively, truncating recursive edges.
+
+    A repeated reference on the current branch becomes an empty schema. Other
+    branches still resolve normally and reference siblings are preserved.
+    """
+    if isinstance(value, list):
+        return [deref(item, doc, active) for item in value]
+    if not isinstance(value, dict):
+        return value
+    resolved = {}
+    if "$ref" in value:
+        ref = value["$ref"]
+        if not ref.startswith("#/"):
+            raise ValueError(f"Only local references are supported: {ref}")
+        if ref not in active:
+            target = doc
+            for part in ref[2:].split("/"):
+                target = target[part.replace("~1", "/").replace("~0", "~")]
+            resolved = deref(target, doc, active | {ref})
+        active = active | {ref}
+    resolved.update({key: deref(item, doc, active) for key, item in value.items() if key != "$ref"})
+    return resolved
+
+def merged_parameters(path_item, op, doc):
+    merged = {}
+    for p in list(path_item.get("parameters") or []) + list(op.get("parameters") or []):
+        p = deref(p, doc)
+        merged[p["name"], p["in"]] = p
+    return list(merged.values())
 
 def body_info(op, doc):
-    body = op.get("requestBody") or {}
+    body = deref(op.get("requestBody") or {}, doc)
     content = body.get("content") or {}
     if not content: return None
-    ctype = sorted(content)[0]; schema = deref(content[ctype].get("schema"), doc)
+    ctype = sorted(content)[0]; schema = deref(content[ctype].get("schema") or {}, doc)
     props = []
     for name, value in (schema.get("properties") or {}).items():
         value = deref(value, doc)
@@ -61,23 +85,20 @@ def generate():
                 name = base; n = 2
                 while name in used[tag]: name = f"{base}-{n}"; n += 1
                 used[tag][name] = True
-                params = list(path_item.get("parameters") or []) + list(op.get("parameters") or [])
-                resolved = []
-                for p in params:
-                    if "$ref" in p:
-                        p = (doc.get("components", {}).get("parameters", {}).get(p["$ref"].rsplit("/", 1)[-1]) or p)
-                    resolved.append(p)
+                resolved = merged_parameters(path_item, op, doc)
                 paths = [parameter(p, doc) for p in resolved if p.get("in") == "path"]
                 query = [parameter(p, doc) for p in resolved if p.get("in") == "query"]
                 headers = [parameter(p, doc) for p in resolved if p.get("in") == "header" and p.get("name", "").lower() not in {"authorization", "x-access-token"}]
+                cookies = [parameter(p, doc) for p in resolved if p.get("in") == "cookie"]
                 security = op.get("security", global_security)
                 scheme = "none" if security == [] or not security else next(iter((security[0] or {}).keys()), "none")
                 # The IAM password reset operation is documented as public in
                 # the server contract used for the Day 3 auth matrix.
                 if service == "iam" and path == "/users/password-reset": scheme = "bearerAuth"
-                binary = any(ct.startswith("application/octet-stream") or ct.startswith("application/zip") for r in (op.get("responses") or {}).values() for ct in (r.get("content") or {}))
+                responses = deref(op.get("responses") or {}, doc)
+                binary = any(ct.startswith("application/octet-stream") or ct.startswith("application/zip") for r in responses.values() for ct in (r.get("content") or {}))
                 description = (op.get("description") or op.get("summary") or "").split(".", 1)[0].strip()
-                operations.append({"service":service,"group":tag,"name":name,"method":method.upper(),"path":path,"summary":op.get("summary", ""),"description":description,"path_parameters":paths,"query_parameters":query,"header_parameters":headers,"request_body":body_info(op, doc),"security_scheme":scheme,"server":server,"returns_binary":binary})
+                operations.append({"service":service,"group":tag,"name":name,"method":method.upper(),"path":path,"summary":op.get("summary", ""),"description":description,"path_parameters":paths,"query_parameters":query,"header_parameters":headers,"cookie_parameters":cookies,"request_body":body_info(op, doc),"security_scheme":scheme,"server":server,"returns_binary":binary})
     operations.sort(key=lambda x: (x["service"], x["group"], x["name"], x["method"], x["path"]))
     return {"operations": operations, "total": len(operations)}
 

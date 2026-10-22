@@ -1,6 +1,7 @@
 {
   "operations": [
     {
+      "cookie_parameters": [],
       "description": "Create baremetal servers",
       "group": "baremetals",
       "header_parameters": [],
@@ -67,6 +68,7 @@
       "summary": "Create baremetal servers"
     },
     {
+      "cookie_parameters": [],
       "description": "Delete baremetal server",
       "group": "baremetals",
       "header_parameters": [],
@@ -75,6 +77,7 @@
       "path": "/v1/baremetals/{id}",
       "path_parameters": [
         {
+          "in": "path",
           "name": "id",
           "required": true,
           "type": "string"
@@ -89,6 +92,7 @@
       "summary": "Delete baremetal server"
     },
     {
+      "cookie_parameters": [],
       "description": "Execute baremetal server action",
       "group": "baremetals",
       "header_parameters": [],
@@ -97,6 +101,7 @@
       "path": "/v1/baremetals/{id}/actions",
       "path_parameters": [
         {
+          "in": "path",
           "name": "id",
           "required": true,
           "type": "string"
@@ -127,6 +132,7 @@
       "summary": "Execute baremetal server action"
     },
     {
+      "cookie_parameters": [],
       "description": "Get baremetal server by ID",
       "group": "baremetals",
       "header_parameters": [],
@@ -135,6 +141,7 @@
       "path": "/v1/baremetals/{id}",
       "path_parameters": [
         {
+          "in": "path",
           "name": "id",
           "required": true,
           "type": "string"
@@ -149,6 +156,7 @@
       "summary": "Get baremetal server by ID"
     },
     {
+      "cookie_parameters": [],
       "description": "Get baremetal products",
       "group": "baremetals",
       "header_parameters": [],
@@ -158,9 +166,10 @@
       "path_parameters": [],
       "query_parameters": [
         {
+          "in": "query",
           "name": "idc",
           "required": false,
-          "type": "idcName"
+          "type": "string"
         }
       ],
       "request_body": null,
@@ -171,6 +180,7 @@
       "summary": "Get baremetal products"
     },
     {
+      "cookie_parameters": [],
       "description": "List all baremetal servers",
       "group": "baremetals",
       "header_parameters": [],
@@ -180,9 +190,10 @@
       "path_parameters": [],
       "query_parameters": [
         {
+          "in": "query",
           "name": "idc",
           "required": false,
-          "type": "idcName"
+          "type": "string"
         }
       ],
       "request_body": null,
@@ -193,6 +204,7 @@
       "summary": "List all baremetal servers"
     },
     {
+      "cookie_parameters": [],
       "description": "Update baremetal server",
       "group": "baremetals",
       "header_parameters": [],
@@ -201,6 +213,7 @@
       "path": "/v1/baremetals/{id}",
       "path_parameters": [
         {
+          "in": "path",
           "name": "id",
           "required": true,
           "type": "string"
@@ -225,6 +238,7 @@
       "summary": "Update baremetal server"
     },
     {
+      "cookie_parameters": [],
       "description": "Generate container shell URL path",
       "group": "containers",
       "header_parameters": [],
@@ -233,6 +247,7 @@
       "path": "/v1/containers/{id}/shell",
       "path_parameters": [
         {
+          "in": "path",
           "name": "id",
           "required": true,
           "type": "string"
@@ -247,6 +262,7 @@
       "summary": "Generate container shell URL path"
     },
     {
+      "cookie_parameters": [],
       "description": "create Container under default namespace",
       "group": "containers",
       "header_parameters": [],
@@ -267,6 +283,7 @@
       "summary": "Create containers"
     },
     {
+      "cookie_parameters": [],
       "description": "Delete container",
       "group": "containers",
       "header_parameters": [],
@@ -275,6 +292,7 @@
       "path": "/v1/containers/{id}",
       "path_parameters": [
         {
+          "in": "path",
           "name": "id",
           "required": true,
           "type": "string"
@@ -289,6 +307,7 @@
       "summary": "Delete container"
     },
     {
+      "cookie_parameters": [],
       "description": "Download container logs",
       "group": "containers",
       "header_parameters": [],
@@ -297,6 +316,7 @@
       "path": "/v1/containers/{id}/logs",
       "path_parameters": [
         {
+          "in": "path",
           "name": "id",
           "required": true,
           "type": "string"
@@ -311,6 +331,7 @@
       "summary": "Download container logs"
     },
     {
+      "cookie_parameters": [],
       "description": "Get container info by ID",
       "group": "containers",
       "header_parameters": [],
@@ -319,6 +340,7 @@
       "path": "/v1/containers/{id}",
       "path_parameters": [
         {
+          "in": "path",
           "name": "id",
           "required": true,
           "type": "string"
@@ -333,6 +355,7 @@
       "summary": "Get container info by ID"
     },
     {
+      "cookie_parameters": [],
       "description": "Get container products",
       "group": "containers",
       "header_parameters": [],
@@ -342,9 +365,10 @@
       "path_parameters": [],
       "query_parameters": [
         {
+          "in": "query",
           "name": "idc",
           "required": false,
-          "type": "idcName"
+          "type": "string"
         }
       ],
       "request_body": null,
@@ -355,6 +379,7 @@
       "summary": "Get container products"
     },
     {
+      "cookie_parameters": [],
       "description": "List container information",
       "group": "containers",
       "header_parameters": [],
@@ -371,6 +396,7 @@
       "summary": "List container information"
     },
     {
+      "cookie_parameters": [],
       "description": "Restart container",
       "group": "containers",
       "header_parameters": [],
@@ -379,6 +405,7 @@
       "path": "/v1/containers/{id}/restart",
       "path_parameters": [
         {
+          "in": "path",
           "name": "id",
           "required": true,
           "type": "string"
@@ -393,6 +420,7 @@
       "summary": "Restart container"
     },
     {
+      "cookie_parameters": [],
       "description": "Update container",
       "group": "containers",
       "header_parameters": [],
@@ -401,6 +429,7 @@
       "path": "/v1/containers/{id}",
       "path_parameters": [
         {
+          "in": "path",
           "name": "id",
           "required": true,
           "type": "string"
@@ -455,6 +484,7 @@
       "summary": "Update container"
     },
     {
+      "cookie_parameters": [],
       "description": "Allocate elastic IP for organization",
       "group": "elastic-ips",
       "header_parameters": [],
@@ -496,6 +526,7 @@
       "summary": "Allocate elastic IP for organization"
     },
     {
+      "cookie_parameters": [],
       "description": "Associate elastic IP with instance",
       "group": "elastic-ips",
       "header_parameters": [],
@@ -504,6 +535,7 @@
       "path": "/v1/elastic-ips/{id}/associate",
       "path_parameters": [
         {
+          "in": "path",
           "name": "id",
           "required": true,
           "type": "string"
@@ -537,6 +569,7 @@
       "summary": "Associate elastic IP with instance"
     },
     {
+      "cookie_parameters": [],
       "description": "Disassociate elastic IP from instance",
       "group": "elastic-ips",
       "header_parameters": [],
@@ -545,6 +578,7 @@
       "path": "/v1/elastic-ips/{id}/disassociate",
       "path_parameters": [
         {
+          "in": "path",
           "name": "id",
           "required": true,
           "type": "string"
@@ -559,6 +593,7 @@
       "summary": "Disassociate elastic IP from instance"
     },
     {
+      "cookie_parameters": [],
       "description": "Get elastic IP",
       "group": "elastic-ips",
       "header_parameters": [],
@@ -567,6 +602,7 @@
       "path": "/v1/elastic-ips/{id}",
       "path_parameters": [
         {
+          "in": "path",
           "name": "id",
           "required": true,
           "type": "string"
@@ -581,6 +617,7 @@
       "summary": "Get elastic IP"
     },
     {
+      "cookie_parameters": [],
       "description": "Get elastic IP products",
       "group": "elastic-ips",
       "header_parameters": [],
@@ -590,9 +627,10 @@
       "path_parameters": [],
       "query_parameters": [
         {
+          "in": "query",
           "name": "idc",
           "required": false,
-          "type": "idcName"
+          "type": "string"
         }
       ],
       "request_body": null,
@@ -603,6 +641,7 @@
       "summary": "Get elastic IP products"
     },
     {
+      "cookie_parameters": [],
       "description": "Get elastic IP",
       "group": "elastic-ips",
       "header_parameters": [],
@@ -619,6 +658,7 @@
       "summary": "Get elastic IP"
     },
     {
+      "cookie_parameters": [],
       "description": "Release elastic IP",
       "group": "elastic-ips",
       "header_parameters": [],
@@ -627,6 +667,7 @@
       "path": "/v1/elastic-ips/{id}",
       "path_parameters": [
         {
+          "in": "path",
           "name": "id",
           "required": true,
           "type": "string"
@@ -641,6 +682,7 @@
       "summary": "Release elastic IP"
     },
     {
+      "cookie_parameters": [],
       "description": "Associate firewall",
       "group": "firewalls",
       "header_parameters": [],
@@ -649,6 +691,7 @@
       "path": "/v1/firewalls/{id}/associate",
       "path_parameters": [
         {
+          "in": "path",
           "name": "id",
           "required": true,
           "type": "string"
@@ -682,6 +725,7 @@
       "summary": "Associate firewall"
     },
     {
+      "cookie_parameters": [],
       "description": "Create firewall",
       "group": "firewalls",
       "header_parameters": [],
@@ -702,6 +746,7 @@
       "summary": "Create firewall"
     },
     {
+      "cookie_parameters": [],
       "description": "Delete firewall",
       "group": "firewalls",
       "header_parameters": [],
@@ -710,6 +755,7 @@
       "path": "/v1/firewalls/{id}",
       "path_parameters": [
         {
+          "in": "path",
           "name": "id",
           "required": true,
           "type": "string"
@@ -724,6 +770,7 @@
       "summary": "Delete firewall"
     },
     {
+      "cookie_parameters": [],
       "description": "Disassociate firewall",
       "group": "firewalls",
       "header_parameters": [],
@@ -732,6 +779,7 @@
       "path": "/v1/firewalls/{id}/disassociate",
       "path_parameters": [
         {
+          "in": "path",
           "name": "id",
           "required": true,
           "type": "string"
@@ -765,6 +813,7 @@
       "summary": "Disassociate firewall"
     },
     {
+      "cookie_parameters": [],
       "description": "Get firewall information by ID",
       "group": "firewalls",
       "header_parameters": [],
@@ -773,6 +822,7 @@
       "path": "/v1/firewalls/{id}",
       "path_parameters": [
         {
+          "in": "path",
           "name": "id",
           "required": true,
           "type": "string"
@@ -787,6 +837,7 @@
       "summary": "Get firewall information by ID"
     },
     {
+      "cookie_parameters": [],
       "description": "List firewalls",
       "group": "firewalls",
       "header_parameters": [],
@@ -796,9 +847,10 @@
       "path_parameters": [],
       "query_parameters": [
         {
+          "in": "query",
           "name": "idc",
           "required": false,
-          "type": "idcName"
+          "type": "string"
         }
       ],
       "request_body": null,
@@ -809,6 +861,7 @@
       "summary": "List firewalls"
     },
     {
+      "cookie_parameters": [],
       "description": "Update firewall",
       "group": "firewalls",
       "header_parameters": [],
@@ -817,6 +870,7 @@
       "path": "/v1/firewalls/{id}",
       "path_parameters": [
         {
+          "in": "path",
           "name": "id",
           "required": true,
           "type": "string"
@@ -851,6 +905,7 @@
       "summary": "Update firewall"
     },
     {
+      "cookie_parameters": [],
       "description": "Get image by ID",
       "group": "images",
       "header_parameters": [],
@@ -859,6 +914,7 @@
       "path": "/v1/images/{id}",
       "path_parameters": [
         {
+          "in": "path",
           "name": "id",
           "required": true,
           "type": "string"
@@ -873,6 +929,7 @@
       "summary": "Get image by ID"
     },
     {
+      "cookie_parameters": [],
       "description": "List images",
       "group": "images",
       "header_parameters": [],
@@ -882,14 +939,16 @@
       "path_parameters": [],
       "query_parameters": [
         {
+          "in": "query",
           "name": "idc",
           "required": false,
-          "type": "idcName"
+          "type": "string"
         },
         {
+          "in": "query",
           "name": "product",
           "required": false,
-          "type": "productName"
+          "type": "string"
         }
       ],
       "request_body": null,
@@ -900,6 +959,7 @@
       "summary": "List images"
     },
     {
+      "cookie_parameters": [],
       "description": "create template",
       "group": "templates",
       "header_parameters": [],
@@ -951,6 +1011,7 @@
       "summary": "Create template"
     },
     {
+      "cookie_parameters": [],
       "description": "Delete template",
       "group": "templates",
       "header_parameters": [],
@@ -959,6 +1020,7 @@
       "path": "/v1/templates/{id}",
       "path_parameters": [
         {
+          "in": "path",
           "name": "id",
           "required": true,
           "type": "string"
@@ -973,6 +1035,7 @@
       "summary": "Delete template"
     },
     {
+      "cookie_parameters": [],
       "description": "Get template",
       "group": "templates",
       "header_parameters": [],
@@ -981,6 +1044,7 @@
       "path": "/v1/templates/{id}",
       "path_parameters": [
         {
+          "in": "path",
           "name": "id",
           "required": true,
           "type": "string"
@@ -995,6 +1059,7 @@
       "summary": "Get template"
     },
     {
+      "cookie_parameters": [],
       "description": "Get templates list",
       "group": "templates",
       "header_parameters": [],
@@ -1011,6 +1076,7 @@
       "summary": "Get templates list"
     },
     {
+      "cookie_parameters": [],
       "description": "Update template",
       "group": "templates",
       "header_parameters": [],
@@ -1019,6 +1085,7 @@
       "path": "/v1/templates/{id}",
       "path_parameters": [
         {
+          "in": "path",
           "name": "id",
           "required": true,
           "type": "string"
@@ -1068,6 +1135,7 @@
       "summary": "Update template"
     },
     {
+      "cookie_parameters": [],
       "description": "Allocate default VPC for organization in IDC",
       "group": "vpcs",
       "header_parameters": [],
@@ -1094,6 +1162,7 @@
       "summary": "Allocate default VPC for organization in IDC"
     },
     {
+      "cookie_parameters": [],
       "description": "Get VPC",
       "group": "vpcs",
       "header_parameters": [],
@@ -1102,6 +1171,7 @@
       "path": "/v1/vpcs/{id}",
       "path_parameters": [
         {
+          "in": "path",
           "name": "id",
           "required": true,
           "type": "string"
@@ -1116,6 +1186,7 @@
       "summary": "Get VPC"
     },
     {
+      "cookie_parameters": [],
       "description": "List all VPCs",
       "group": "vpcs",
       "header_parameters": [],
@@ -1125,9 +1196,10 @@
       "path_parameters": [],
       "query_parameters": [
         {
+          "in": "query",
           "name": "idc",
           "required": false,
-          "type": "idcName"
+          "type": "string"
         }
       ],
       "request_body": null,
@@ -1138,6 +1210,7 @@
       "summary": "List all VPCs"
     },
     {
+      "cookie_parameters": [],
       "description": "Release default VPC",
       "group": "vpcs",
       "header_parameters": [],
@@ -1146,6 +1219,7 @@
       "path": "/v1/vpcs/{id}",
       "path_parameters": [
         {
+          "in": "path",
           "name": "id",
           "required": true,
           "type": "string"
@@ -1160,6 +1234,7 @@
       "summary": "Release default VPC"
     },
     {
+      "cookie_parameters": [],
       "description": "Allows user to accept an invitation to join the organization using invitationKey",
       "group": "invitations",
       "header_parameters": [],
@@ -1168,6 +1243,7 @@
       "path": "/invitations/{invitationKey}",
       "path_parameters": [
         {
+          "in": "path",
           "name": "invitationKey",
           "required": true,
           "type": "string"
@@ -1182,6 +1258,7 @@
       "summary": "Accept invitation by key"
     },
     {
+      "cookie_parameters": [],
       "description": "Create a short-term authentication token using user credentials for exchanging access and refresh tokens",
       "group": "me",
       "header_parameters": [],
@@ -1213,6 +1290,7 @@
       "summary": "Create an auth token."
     },
     {
+      "cookie_parameters": [],
       "description": "Create a short-term authentication token using a third-party OAuth provider (e",
       "group": "me",
       "header_parameters": [],
@@ -1249,9 +1327,17 @@
       "summary": "Create an auth token via OAuth."
     },
     {
+      "cookie_parameters": [],
       "description": "Create a login session for user",
       "group": "me",
-      "header_parameters": [],
+      "header_parameters": [
+        {
+          "in": "header",
+          "name": "CE-ClientId",
+          "required": true,
+          "type": "string"
+        }
+      ],
       "method": "POST",
       "name": "create-session",
       "path": "/me/sessions",
@@ -1280,6 +1366,7 @@
       "summary": "Create session"
     },
     {
+      "cookie_parameters": [],
       "description": "Create an SSH public key for the current authenticated user",
       "group": "me",
       "header_parameters": [],
@@ -1311,13 +1398,21 @@
       "summary": "Create an SSH key"
     },
     {
+      "cookie_parameters": [],
       "description": "Delete an SSH key owned by the currently authenticated user",
       "group": "me",
       "header_parameters": [],
       "method": "DELETE",
       "name": "delete-me-ssh-keys-ssh-key-id",
       "path": "/me/ssh-keys/{sshKeyId}",
-      "path_parameters": [],
+      "path_parameters": [
+        {
+          "in": "path",
+          "name": "sshKeyId",
+          "required": true,
+          "type": "string"
+        }
+      ],
       "query_parameters": [],
       "request_body": null,
       "returns_binary": false,
@@ -1327,6 +1422,7 @@
       "summary": "Delete an SSH key."
     },
     {
+      "cookie_parameters": [],
       "description": "Retrieves the profile information of the current authenticated user",
       "group": "me",
       "header_parameters": [],
@@ -1343,6 +1439,7 @@
       "summary": "Retrieve user's profile"
     },
     {
+      "cookie_parameters": [],
       "description": "Retrieve a list of SSH keys for the current authenticated user",
       "group": "me",
       "header_parameters": [],
@@ -1352,11 +1449,13 @@
       "path_parameters": [],
       "query_parameters": [
         {
+          "in": "query",
           "name": "name",
           "required": false,
           "type": "string"
         },
         {
+          "in": "query",
           "name": "fingerprint",
           "required": false,
           "type": "string"
@@ -1370,9 +1469,17 @@
       "summary": "List SSH keys"
     },
     {
+      "cookie_parameters": [],
       "description": "Refresh an existing session, which will return a new access token and refresh token",
       "group": "me",
-      "header_parameters": [],
+      "header_parameters": [
+        {
+          "in": "header",
+          "name": "CE-ClientId",
+          "required": true,
+          "type": "string"
+        }
+      ],
       "method": "PATCH",
       "name": "refresh-session",
       "path": "/me/sessions",
@@ -1396,6 +1503,7 @@
       "summary": "Refresh session"
     },
     {
+      "cookie_parameters": [],
       "description": "Resend 2FA verificaion code",
       "group": "me",
       "header_parameters": [],
@@ -1422,13 +1530,21 @@
       "summary": "Resend 2FA verification code."
     },
     {
+      "cookie_parameters": [],
       "description": "Update the name of an SSH key owned by the currently authenticated user",
       "group": "me",
       "header_parameters": [],
       "method": "PATCH",
       "name": "update-ssh-key",
       "path": "/me/ssh-keys/{sshKeyId}",
-      "path_parameters": [],
+      "path_parameters": [
+        {
+          "in": "path",
+          "name": "sshKeyId",
+          "required": true,
+          "type": "string"
+        }
+      ],
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
@@ -1448,6 +1564,7 @@
       "summary": "Update an SSH key."
     },
     {
+      "cookie_parameters": [],
       "description": "Allows a user to update their password",
       "group": "me",
       "header_parameters": [],
@@ -1489,6 +1606,7 @@
       "summary": "Update user password"
     },
     {
+      "cookie_parameters": [],
       "description": "Update the current authenticated user's profile",
       "group": "me",
       "header_parameters": [],
@@ -1520,6 +1638,7 @@
       "summary": "Update user's profile"
     },
     {
+      "cookie_parameters": [],
       "description": "Validate the API key from the Authorization Bearer token and return the key details",
       "group": "me",
       "header_parameters": [],
@@ -1536,6 +1655,7 @@
       "summary": "Verify API Key and retrieve the key details"
     },
     {
+      "cookie_parameters": [],
       "description": "Exchanges an authorization code for an access token",
       "group": "oauth",
       "header_parameters": [],
@@ -1570,6 +1690,7 @@
       "summary": "Exchange authorization code for access token"
     },
     {
+      "cookie_parameters": [],
       "description": "This API is deprecated, use POST /invitations/{invitationKey} instead",
       "group": "organizations",
       "header_parameters": [],
@@ -1578,6 +1699,13 @@
       "path": "/organizations/{orgId}/invitations/{invitationId}",
       "path_parameters": [
         {
+          "in": "path",
+          "name": "orgId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "in": "path",
           "name": "invitationId",
           "required": true,
           "type": "string"
@@ -1592,13 +1720,21 @@
       "summary": "(DEPRECATED) Accept invitation"
     },
     {
+      "cookie_parameters": [],
       "description": "Allows a user to generate an API key for their organization",
       "group": "organizations",
       "header_parameters": [],
       "method": "POST",
       "name": "create-api-key",
       "path": "/organizations/{orgId}/api-keys",
-      "path_parameters": [],
+      "path_parameters": [
+        {
+          "in": "path",
+          "name": "orgId",
+          "required": true,
+          "type": "string"
+        }
+      ],
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
@@ -1632,6 +1768,7 @@
       "summary": "Create an API key"
     },
     {
+      "cookie_parameters": [],
       "description": "Deletes an API key by its ID",
       "group": "organizations",
       "header_parameters": [],
@@ -1640,6 +1777,13 @@
       "path": "/organizations/{orgId}/api-keys/{apiKeyId}",
       "path_parameters": [
         {
+          "in": "path",
+          "name": "orgId",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "in": "path",
           "name": "apiKeyId",
           "required": true,
           "type": "string"
@@ -1654,13 +1798,21 @@
       "summary": "Delete an API key"
     },
     {
+      "cookie_parameters": [],
       "description": "Deletes an organization",
       "group": "organizations",
       "header_parameters": [],
       "method": "DELETE",
       "name": "delete-organization",
       "path": "/organizations/{orgId}",
-      "path_parameters": [],
+      "path_parameters": [
+        {
+          "in": "path",
+          "name": "orgId",
+          "required": true,
+          "type": "string"
+        }
+      ],
       "query_parameters": [],
       "request_body": null,
       "returns_binary": false,
@@ -1670,13 +1822,21 @@
       "summary": "Delete an organization"
     },
     {
+      "cookie_parameters": [],
       "description": "Retrieve information about a specific organization by its ID",
       "group": "organizations",
       "header_parameters": [],
       "method": "GET",
       "name": "get-organization",
       "path": "/organizations/{orgId}",
-      "path_parameters": [],
+      "path_parameters": [
+        {
+          "in": "path",
+          "name": "orgId",
+          "required": true,
+          "type": "string"
+        }
+      ],
       "query_parameters": [],
       "request_body": null,
       "returns_binary": false,
@@ -1686,13 +1846,21 @@
       "summary": "Retrieve organization information"
     },
     {
+      "cookie_parameters": [],
       "description": "Retrieve a list of users belonging to the specified organization",
       "group": "organizations",
       "header_parameters": [],
       "method": "GET",
       "name": "get-organizations-org-id-users",
       "path": "/organizations/{orgId}/users",
-      "path_parameters": [],
+      "path_parameters": [
+        {
+          "in": "path",
+          "name": "orgId",
+          "required": true,
+          "type": "string"
+        }
+      ],
       "query_parameters": [],
       "request_body": null,
       "returns_binary": false,
@@ -1702,13 +1870,21 @@
       "summary": "List users by organization"
     },
     {
+      "cookie_parameters": [],
       "description": "Retrieve a list of API keys accessible by the authenticated user",
       "group": "organizations",
       "header_parameters": [],
       "method": "GET",
       "name": "list-api-keys",
       "path": "/organizations/{orgId}/api-keys",
-      "path_parameters": [],
+      "path_parameters": [
+        {
+          "in": "path",
+          "name": "orgId",
+          "required": true,
+          "type": "string"
+        }
+      ],
       "query_parameters": [],
       "request_body": null,
       "returns_binary": false,
@@ -1718,6 +1894,7 @@
       "summary": "List API keys"
     },
     {
+      "cookie_parameters": [],
       "description": "Allow users to register an organization",
       "group": "organizations",
       "header_parameters": [],
@@ -1744,13 +1921,21 @@
       "summary": "Register an organization"
     },
     {
+      "cookie_parameters": [],
       "description": "Allows an organization admin to invite users via email",
       "group": "organizations",
       "header_parameters": [],
       "method": "POST",
       "name": "send-invitations-by-email",
       "path": "/organizations/{orgId}/invitations/email",
-      "path_parameters": [],
+      "path_parameters": [
+        {
+          "in": "path",
+          "name": "orgId",
+          "required": true,
+          "type": "string"
+        }
+      ],
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
@@ -1770,13 +1955,21 @@
       "summary": "Send invitations via email"
     },
     {
+      "cookie_parameters": [],
       "description": "Transfers the ownership of an organization to another user within the organization",
       "group": "organizations",
       "header_parameters": [],
       "method": "PATCH",
       "name": "transfer-organization-owner",
       "path": "/organizations/{orgId}/owner",
-      "path_parameters": [],
+      "path_parameters": [
+        {
+          "in": "path",
+          "name": "orgId",
+          "required": true,
+          "type": "string"
+        }
+      ],
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
@@ -1796,13 +1989,21 @@
       "summary": "Transfer organization ownership"
     },
     {
+      "cookie_parameters": [],
       "description": "Update information about a specific organization by its ID",
       "group": "organizations",
       "header_parameters": [],
       "method": "PATCH",
       "name": "update-organization-info",
       "path": "/organizations/{orgId}",
-      "path_parameters": [],
+      "path_parameters": [
+        {
+          "in": "path",
+          "name": "orgId",
+          "required": true,
+          "type": "string"
+        }
+      ],
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
@@ -1822,13 +2023,21 @@
       "summary": "Update organization information"
     },
     {
+      "cookie_parameters": [],
       "description": "Delete a user account",
       "group": "users",
       "header_parameters": [],
       "method": "DELETE",
       "name": "delete-users-user-id",
       "path": "/users/{userId}",
-      "path_parameters": [],
+      "path_parameters": [
+        {
+          "in": "path",
+          "name": "userId",
+          "required": true,
+          "type": "string"
+        }
+      ],
       "query_parameters": [],
       "request_body": null,
       "returns_binary": false,
@@ -1838,6 +2047,7 @@
       "summary": "Delete a user account."
     },
     {
+      "cookie_parameters": [],
       "description": "Confirms the user's email address and finalizes the the account creation process",
       "group": "users",
       "header_parameters": [],
@@ -1864,6 +2074,7 @@
       "summary": "Verify user's email and complete user registration."
     },
     {
+      "cookie_parameters": [],
       "description": "Sends a password reset email to the user",
       "group": "users",
       "header_parameters": [],
@@ -1890,6 +2101,7 @@
       "summary": "Request password reset"
     },
     {
+      "cookie_parameters": [],
       "description": "Resend email verificaion code",
       "group": "users",
       "header_parameters": [],
@@ -1906,6 +2118,7 @@
       "summary": "Resend email verification code"
     },
     {
+      "cookie_parameters": [],
       "description": "Retrieves a list of IDC information that are not marked as hidden",
       "group": "idcs",
       "header_parameters": [],
@@ -1922,13 +2135,21 @@
       "summary": "List all IDCs"
     },
     {
+      "cookie_parameters": [],
       "description": "Connects to a running sandbox and returns its data-plane connection info (domain and access token)",
       "group": "Sandbox",
       "header_parameters": [],
       "method": "POST",
       "name": "connect-sandbox",
       "path": "/sandboxes/{id}/connect",
-      "path_parameters": [],
+      "path_parameters": [
+        {
+          "in": "path",
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
@@ -1948,9 +2169,17 @@
       "summary": "Connect to a sandbox"
     },
     {
+      "cookie_parameters": [],
       "description": "Creates a sandbox from a `template_id`",
       "group": "Sandbox",
-      "header_parameters": [],
+      "header_parameters": [
+        {
+          "in": "header",
+          "name": "Idempotency-Key",
+          "required": false,
+          "type": "string"
+        }
+      ],
       "method": "POST",
       "name": "create-sandbox",
       "path": "/sandboxes",
@@ -1994,13 +2223,21 @@
       "summary": "Create a sandbox"
     },
     {
+      "cookie_parameters": [],
       "description": "Accepts the deletion",
       "group": "Sandbox",
       "header_parameters": [],
       "method": "DELETE",
       "name": "delete-sandbox",
       "path": "/sandboxes/{id}",
-      "path_parameters": [],
+      "path_parameters": [
+        {
+          "in": "path",
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
       "query_parameters": [],
       "request_body": null,
       "returns_binary": false,
@@ -2010,13 +2247,21 @@
       "summary": "Delete (kill) a sandbox"
     },
     {
+      "cookie_parameters": [],
       "description": "Returns sandbox details",
       "group": "Sandbox",
       "header_parameters": [],
       "method": "GET",
       "name": "get-sandbox",
       "path": "/sandboxes/{id}",
-      "path_parameters": [],
+      "path_parameters": [
+        {
+          "in": "path",
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
       "query_parameters": [],
       "request_body": null,
       "returns_binary": false,
@@ -2026,6 +2271,7 @@
       "summary": "Get sandbox details"
     },
     {
+      "cookie_parameters": [],
       "description": "Returns sandboxes that are still actionable or still worth watching: `provisioning`, `running`, `updating`, `checkpointing`, plus the terminal failure state `failed`",
       "group": "Sandbox",
       "header_parameters": [],
@@ -2035,11 +2281,33 @@
       "path_parameters": [],
       "query_parameters": [
         {
+          "default": 1,
+          "in": "query",
+          "name": "page",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "default": 20,
+          "in": "query",
+          "name": "page_size",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "in": "query",
+          "name": "idc_name",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "in": "query",
           "name": "state",
           "required": false,
           "type": "array"
         },
         {
+          "in": "query",
           "name": "metadata[key]",
           "required": false,
           "type": "string"
@@ -2053,13 +2321,21 @@
       "summary": "List active sandboxes"
     },
     {
+      "cookie_parameters": [],
       "description": "Resets the time-to-live relative to the current time",
       "group": "Sandbox",
       "header_parameters": [],
       "method": "POST",
       "name": "set-sandbox-timeout",
       "path": "/sandboxes/{id}/timeout",
-      "path_parameters": [],
+      "path_parameters": [
+        {
+          "in": "path",
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
@@ -2079,13 +2355,21 @@
       "summary": "Set sandbox timeout"
     },
     {
+      "cookie_parameters": [],
       "description": "Replaces the customer-defined metadata as a whole — no per-key merging; passing an empty object clears it",
       "group": "Sandbox",
       "header_parameters": [],
       "method": "PATCH",
       "name": "update-sandbox",
       "path": "/sandboxes/{id}",
-      "path_parameters": [],
+      "path_parameters": [
+        {
+          "in": "path",
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
       "query_parameters": [],
       "request_body": {
         "content_type": "application/json",
@@ -2105,13 +2389,28 @@
       "summary": "Update sandbox metadata"
     },
     {
+      "cookie_parameters": [],
       "description": "Requests cancellation of a non-terminal execution",
       "group": "Sandbox-Exec",
-      "header_parameters": [],
+      "header_parameters": [
+        {
+          "in": "header",
+          "name": "X-Request-ID",
+          "required": false,
+          "type": "string"
+        }
+      ],
       "method": "POST",
       "name": "cancel-sandbox-execution",
       "path": "/executions/{execution_id}/cancel",
-      "path_parameters": [],
+      "path_parameters": [
+        {
+          "in": "path",
+          "name": "execution_id",
+          "required": true,
+          "type": "string"
+        }
+      ],
       "query_parameters": [],
       "request_body": null,
       "returns_binary": false,
@@ -2121,14 +2420,37 @@
       "summary": "Cancel a sandbox execution"
     },
     {
+      "cookie_parameters": [],
       "description": "Starts an asynchronous shell execution in the sandbox",
       "group": "Sandbox-Exec",
-      "header_parameters": [],
+      "header_parameters": [
+        {
+          "in": "header",
+          "name": "X-Request-ID",
+          "required": false,
+          "type": "string"
+        }
+      ],
       "method": "POST",
       "name": "create-sandbox-execution",
       "path": "/executions",
       "path_parameters": [],
-      "query_parameters": [],
+      "query_parameters": [
+        {
+          "default": false,
+          "in": "query",
+          "name": "wait",
+          "required": false,
+          "type": "boolean"
+        },
+        {
+          "default": 25,
+          "in": "query",
+          "name": "wait_timeout_seconds",
+          "required": false,
+          "type": "integer"
+        }
+      ],
       "request_body": {
         "content_type": "application/json",
         "properties": [
@@ -2155,13 +2477,28 @@
       "summary": "Execute a command in a sandbox"
     },
     {
+      "cookie_parameters": [],
       "description": "Get a sandbox execution",
       "group": "Sandbox-Exec",
-      "header_parameters": [],
+      "header_parameters": [
+        {
+          "in": "header",
+          "name": "X-Request-ID",
+          "required": false,
+          "type": "string"
+        }
+      ],
       "method": "GET",
       "name": "get-sandbox-execution",
       "path": "/executions/{execution_id}",
-      "path_parameters": [],
+      "path_parameters": [
+        {
+          "in": "path",
+          "name": "execution_id",
+          "required": true,
+          "type": "string"
+        }
+      ],
       "query_parameters": [],
       "request_body": null,
       "returns_binary": false,
@@ -2171,10 +2508,12 @@
       "summary": "Get a sandbox execution"
     },
     {
+      "cookie_parameters": [],
       "description": "Reads a single file inside the sandbox by absolute path; the response body is the raw byte stream",
       "group": "Sandbox-Files",
       "header_parameters": [
         {
+          "in": "header",
           "name": "Range",
           "required": false,
           "type": "string"
@@ -2184,7 +2523,20 @@
       "name": "download-sandbox-file",
       "path": "/files",
       "path_parameters": [],
-      "query_parameters": [],
+      "query_parameters": [
+        {
+          "in": "query",
+          "name": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "in": "query",
+          "name": "username",
+          "required": false,
+          "type": "string"
+        }
+      ],
       "request_body": null,
       "returns_binary": true,
       "security_scheme": "sandboxAccessToken",
@@ -2193,6 +2545,7 @@
       "summary": "Download a sandbox file"
     },
     {
+      "cookie_parameters": [],
       "description": "Writes one file to the given absolute path inside the sandbox via `multipart/form-data`, overwriting any existing file",
       "group": "Sandbox-Files",
       "header_parameters": [],
@@ -2200,7 +2553,20 @@
       "name": "upload-sandbox-file",
       "path": "/files",
       "path_parameters": [],
-      "query_parameters": [],
+      "query_parameters": [
+        {
+          "in": "query",
+          "name": "path",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "in": "query",
+          "name": "username",
+          "required": false,
+          "type": "string"
+        }
+      ],
       "request_body": {
         "content_type": "multipart/form-data",
         "properties": [
@@ -2219,9 +2585,17 @@
       "summary": "Upload a sandbox file"
     },
     {
+      "cookie_parameters": [],
       "description": "Creates a logical Template together with its initial Build",
       "group": "SandboxTemplate",
-      "header_parameters": [],
+      "header_parameters": [
+        {
+          "in": "header",
+          "name": "Idempotency-Key",
+          "required": true,
+          "type": "string"
+        }
+      ],
       "method": "POST",
       "name": "create-template",
       "path": "/templates",
@@ -2270,14 +2644,29 @@
       "summary": "Create a Template and start its initial Build"
     },
     {
+      "cookie_parameters": [],
       "description": "Soft-deletes the Template so it disappears from tenant-visible lists",
       "group": "SandboxTemplate",
       "header_parameters": [],
       "method": "DELETE",
       "name": "delete-template",
       "path": "/templates/{id}",
-      "path_parameters": [],
-      "query_parameters": [],
+      "path_parameters": [
+        {
+          "in": "path",
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [
+        {
+          "in": "query",
+          "name": "idc_name",
+          "required": false,
+          "type": "string"
+        }
+      ],
       "request_body": null,
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -2286,14 +2675,29 @@
       "summary": "Delete a Template"
     },
     {
+      "cookie_parameters": [],
       "description": "Returns the logical Template and its current and latest Build references",
       "group": "SandboxTemplate",
       "header_parameters": [],
       "method": "GET",
       "name": "get-template",
       "path": "/templates/{id}",
-      "path_parameters": [],
-      "query_parameters": [],
+      "path_parameters": [
+        {
+          "in": "path",
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [
+        {
+          "in": "query",
+          "name": "idc_name",
+          "required": false,
+          "type": "string"
+        }
+      ],
       "request_body": null,
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -2302,13 +2706,27 @@
       "summary": "Get a Template"
     },
     {
+      "cookie_parameters": [],
       "description": "Returns normalized Build status and artifact availability",
       "group": "SandboxTemplate",
       "header_parameters": [],
       "method": "GET",
       "name": "get-template-build",
       "path": "/templates/{template_id}/builds/{id}",
-      "path_parameters": [],
+      "path_parameters": [
+        {
+          "in": "path",
+          "name": "template_id",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "in": "path",
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
       "query_parameters": [],
       "request_body": null,
       "returns_binary": false,
@@ -2318,22 +2736,38 @@
       "summary": "Get a Template Build"
     },
     {
+      "cookie_parameters": [],
       "description": "Returns live logs for a Template Build",
       "group": "SandboxTemplate",
       "header_parameters": [],
       "method": "GET",
       "name": "get-template-build-logs",
       "path": "/templates/{template_id}/builds/{id}/logs",
-      "path_parameters": [],
+      "path_parameters": [
+        {
+          "in": "path",
+          "name": "template_id",
+          "required": true,
+          "type": "string"
+        },
+        {
+          "in": "path",
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
       "query_parameters": [
         {
           "default": 0,
+          "in": "query",
           "name": "offset",
           "required": false,
           "type": "integer"
         },
         {
           "default": 100,
+          "in": "query",
           "name": "limit",
           "required": false,
           "type": "integer"
@@ -2345,6 +2779,7 @@
             "warn",
             "error"
           ],
+          "in": "query",
           "name": "level",
           "required": false,
           "type": "string"
@@ -2358,6 +2793,7 @@
       "summary": "Get live Template Build logs"
     },
     {
+      "cookie_parameters": [],
       "description": "Unified product catalog query: identity, display name, status and\nresources per product",
       "group": "SandboxTemplate",
       "header_parameters": [],
@@ -2367,6 +2803,7 @@
       "path_parameters": [],
       "query_parameters": [
         {
+          "in": "query",
           "name": "idc_name",
           "required": true,
           "type": "string"
@@ -2376,12 +2813,14 @@
           "enum": [
             "sandbox"
           ],
+          "in": "query",
           "name": "resource_type",
           "required": false,
           "type": "string"
         },
         {
           "default": false,
+          "in": "query",
           "name": "include_unavailable",
           "required": false,
           "type": "boolean"
@@ -2395,14 +2834,37 @@
       "summary": "List the product catalog (unified, tenant-facing)"
     },
     {
+      "cookie_parameters": [],
       "description": "Lists immutable Build attempts in reverse chronological order",
       "group": "SandboxTemplate",
       "header_parameters": [],
       "method": "GET",
       "name": "list-template-builds",
       "path": "/templates/{template_id}/builds",
-      "path_parameters": [],
-      "query_parameters": [],
+      "path_parameters": [
+        {
+          "in": "path",
+          "name": "template_id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [
+        {
+          "default": 1,
+          "in": "query",
+          "name": "page",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "default": 20,
+          "in": "query",
+          "name": "page_size",
+          "required": false,
+          "type": "integer"
+        }
+      ],
       "request_body": null,
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -2411,6 +2873,7 @@
       "summary": "List Template Builds"
     },
     {
+      "cookie_parameters": [],
       "description": "Lists Templates visible to the authenticated organization",
       "group": "SandboxTemplate",
       "header_parameters": [],
@@ -2418,7 +2881,28 @@
       "name": "list-templates",
       "path": "/templates",
       "path_parameters": [],
-      "query_parameters": [],
+      "query_parameters": [
+        {
+          "in": "query",
+          "name": "idc_name",
+          "required": false,
+          "type": "string"
+        },
+        {
+          "default": 1,
+          "in": "query",
+          "name": "page",
+          "required": false,
+          "type": "integer"
+        },
+        {
+          "default": 20,
+          "in": "query",
+          "name": "page_size",
+          "required": false,
+          "type": "integer"
+        }
+      ],
       "request_body": null,
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -2427,14 +2911,29 @@
       "summary": "List Templates"
     },
     {
+      "cookie_parameters": [],
       "description": "Updates mutable metadata only (`name`, `description`, `labels`)",
       "group": "SandboxTemplate",
       "header_parameters": [],
       "method": "PATCH",
       "name": "update-template",
       "path": "/templates/{id}",
-      "path_parameters": [],
-      "query_parameters": [],
+      "path_parameters": [
+        {
+          "in": "path",
+          "name": "id",
+          "required": true,
+          "type": "string"
+        }
+      ],
+      "query_parameters": [
+        {
+          "in": "query",
+          "name": "idc_name",
+          "required": false,
+          "type": "string"
+        }
+      ],
       "request_body": {
         "content_type": "application/json",
         "properties": [
