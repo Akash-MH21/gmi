@@ -107,7 +107,7 @@ class SandboxClient:
 
     def data(self, method, path, **kwargs):
         value = self.request(method, path, **kwargs)
-        return value.get('data', value)
+        return value.get('data', value) if isinstance(value, dict) else value
 
     def pages(self, path, params=None):
         rows = []
@@ -354,7 +354,11 @@ def templates_create(client, as_json, name, image, product, cmd, start_cmd, idc_
 @command_options
 def templates_delete(client, as_json, template_id, yes):
     confirm(yes, as_json, 'Delete this template?')
-    emit(client, client.data('DELETE', f'/templates/{component(template_id)}'), as_json)
+    value = client.data('DELETE', f'/templates/{component(template_id)}')
+    if as_json:
+        emit(client, value, True)
+    else:
+        click.echo(f'deleting template {human_field(client, value.get("id", template_id))} (accepted)')
 
 
 @templates_group.command('logs')
@@ -373,7 +377,13 @@ def templates_logs(client, as_json, template_id):
         if next_offset <= offset:
             raise GMIError('Build logs returned an invalid pagination offset.')
         offset = next_offset
-    emit(client, entries, as_json)
+    if as_json:
+        emit(client, entries, True)
+    elif entries:
+        for entry in entries:
+            click.echo(human_field(client, entry['message']))
+    else:
+        click.echo('No build logs.')
 
 
 @sandbox_group.command('create')
@@ -405,9 +415,12 @@ def sandbox_create(client, as_json, template, timeout, envs, idc_name, wait, wai
     client.check_deletion(details)
     value = {**value, **details, 'id': sandbox_id}
     value.setdefault('end_at', None)
-    if show_token:
+    if show_token and as_json:
         click.echo('Warning: sandbox access and traffic tokens are secrets. Shown once below.', err=True)
-    emit(client, value, as_json, show_token)
+    if as_json:
+        emit(client, value, True, show_token)
+    else:
+        click.echo(f'created sandbox {human_field(client, sandbox_id)} ends {human_field(client, value["end_at"])}')
 
 
 @sandbox_group.command('list')
@@ -450,7 +463,11 @@ def sandbox_get(client, as_json, sandbox_id):
 @command_options
 def sandbox_kill(client, as_json, sandbox_id, yes):
     confirm(yes, as_json, 'Kill this sandbox?')
-    emit(client, client.data('DELETE', f'/sandboxes/{component(sandbox_id)}'), as_json)
+    value = client.data('DELETE', f'/sandboxes/{component(sandbox_id)}')
+    if as_json:
+        emit(client, value, True)
+    else:
+        click.echo(f'killing sandbox {human_field(client, value.get("id", sandbox_id))} (accepted)')
 
 
 @sandbox_group.command('timeout')
@@ -460,7 +477,11 @@ def sandbox_kill(client, as_json, sandbox_id, yes):
 @command_options
 def sandbox_timeout(client, as_json, sandbox_id, seconds, yes):
     confirm(yes, as_json, 'Change the billable sandbox lifetime?')
-    emit(client, client.data('POST', f'/sandboxes/{component(sandbox_id)}/timeout', json={'timeout': seconds}), as_json)
+    value = client.data('POST', f'/sandboxes/{component(sandbox_id)}/timeout', json={'timeout': seconds})
+    if as_json:
+        emit(client, value, True)
+    else:
+        click.echo(f'timeout set: {human_field(client, value["id"])} ends {human_field(client, value["new_end_at"])}')
 
 
 def execution_output(client, value, as_json):
@@ -494,7 +515,10 @@ def sandbox_put(client, as_json, sandbox_id, local, remote, username):
     with local.open('rb') as handle:
         value = client.data('POST', '/files', connection=connection, params=params,
                             files={'file': (local.name, handle, 'application/octet-stream')})
-    emit(client, value, as_json)
+    if as_json:
+        emit(client, value, True)
+    else:
+        click.echo(f'uploaded {human_field(client, local)} to {human_field(client, remote)}')
 
 
 @sandbox_group.command('get-file')
@@ -513,7 +537,10 @@ def sandbox_get_file(client, as_json, sandbox_id, remote, output, username):
         params['username'] = username
     content = client.request('GET', '/files', connection=connection, params=params, binary=True)
     Path(destination).write_bytes(content)
-    emit(client, {'path': str(destination), 'bytes': len(content)}, as_json)
+    if as_json:
+        emit(client, {'path': str(destination), 'bytes': len(content)}, True)
+    else:
+        click.echo(f'downloaded {human_field(client, remote)} to {human_field(client, destination)} ({len(content)} bytes)')
 
 
 @sandbox_group.command('run')

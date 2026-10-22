@@ -187,8 +187,8 @@ def test_creation_masks_tokens_and_reports_expiry(cloud, as_json, show_token):
     assert COMPUTE not in (result.stdout + result.stderr)
     assert 'old-secret-token' not in (result.stdout + result.stderr)
     for token in (ACCESS, TRAFFIC):
-        assert (result.stdout + result.stderr).count(token) == (1 if show_token else 0)
-    assert ('Warning:' in (result.stdout + result.stderr)) == show_token
+        assert (result.stdout + result.stderr).count(token) == (1 if show_token and as_json else 0)
+    assert ('Warning:' in (result.stdout + result.stderr)) == (show_token and as_json)
     assert '2026-10-22T12:05:00Z' in result.stdout
     assert 'box' in result.stdout
     create = next(r for r in cloud.requests if r.method == 'POST' and r.url.path.endswith('/sandboxes'))
