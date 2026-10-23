@@ -45,7 +45,7 @@ GMI Cloud has an OpenAI-compatible API, a Model Hub and a web console. `gmi` add
 - **Careful with your key.** Hidden prompt, verified before it is saved, stored with mode 600, never printed.
 
 > [!NOTE]
-> **Status: Day 4 of a six-day public build (20 to 25 Oct 2026).** Days 1 to 3 include live API verification. Day 4 adds AgentBox commands and an HTTP service tested offline. Sandbox data plane operations are unverified live and marketplace publication is pending. See the [roadmap](#roadmap) for scope and verification limits.
+> **Status: Day 4 of a six-day public build (20 to 25 Oct 2026).** Days 1 to 3 include live API verification. The owner verified sandbox run, create, exec, file transfer, get, timeout and kill live on 23 October. The service image was built and run locally on 22 October. Marketplace deployment and Cluster writes remain unverified. See the [roadmap](#roadmap) for scope and verification limits.
 
 ## Install
 
@@ -376,11 +376,10 @@ Every non-GET asks for confirmation. DELETE also says `This deletes data.`. Use 
 
 ## `gmi sandbox`: AgentBox
 
-Day 4 adds friendly control plane commands for products, templates, sandbox
-creation, inspection, lifetime changes and deletion. Exec, file transfer and
-one-shot runs implement the published data plane contract and are **unverified
-live**. All Day 4 tests are offline. See [the AgentBox guide](docs/AGENTBOX.md)
-for the full command reference and known platform billing deletion.
+Day 4 adds sandbox commands and a small HTTP chat service. The owner verified
+sandbox run, create, exec, put, get-file, get, timeout and kill live on 23 October
+2026. Implementation tests stay offline. See [the AgentBox guide](docs/AGENTBOX.md)
+for the command reference, live verification record and billing deletion behaviour.
 
 Use a compute-scope key in `GMI_COMPUTE_API_KEY` or `GMI_SANDBOX_API_KEY`.
 The normal inference key cannot authorize these operations. IDC precedence is
@@ -480,12 +479,60 @@ only `X-Access-Token` to the sandbox host. Exec returns the process exit code.
 `run` reuses a matching ready template or builds one, creates and waits for a
 sandbox, executes the command and attempts to kill it even on failure or Ctrl+C.
 
-The owner observed immediate platform deletion with
-`Sandbox.BillingNoPermission`, initiated by `billing`. gmi stops at the first
-response showing deletion and reports the message, code and initiator with a
-non-zero exit. It says this is not a gmi error. This path is tested offline;
-live exec and file transfer remain blocked by the organization's purchase
-permission. Marketplace publication is pending.
+Owner verified live on 23 October 2026 at about 09:30 IST with a compute key
+from a clean install of main, after GMI fixed the organization's billing permission:
+
+```text
+$ gmi sandbox run --image ubuntu:24.04 --yes -- sh -c "echo hello-from-sandbox; uname -sr; id -un"
+hello-from-sandbox
+Linux 6.1.158+
+root
+```
+
+The run exited 0 in 18 seconds and left no sandbox behind. The reusable template
+stayed. The owner also verified these commands (ID, TEMPLATE, TIME, LOCAL and OUT
+are placeholders for the reported values):
+
+```text
+$ gmi sandbox create TEMPLATE --timeout 240 --wait --yes
+created sandbox ID ends TIME
+
+$ gmi sandbox exec ID -- sh -c "echo from-exec; pwd"
+from-exec
+/
+
+$ gmi sandbox exec ID -- sh -c "echo oops >&2; exit 3"
+oops
+
+$ gmi sandbox put ID LOCAL /tmp/in.txt
+uploaded LOCAL to /tmp/in.txt
+
+$ gmi sandbox get-file ID /tmp/in.txt --out OUT
+downloaded /tmp/in.txt to OUT (22 bytes)
+
+$ gmi sandbox timeout ID 1200 --yes
+timeout set: ID ends TIME
+
+$ gmi sandbox kill ID --yes
+killing sandbox ID (accepted)
+```
+
+The failing exec printed `oops` on stderr and gmi exited 3.
+`gmi sandbox exec ID -- cat /tmp/in.txt` returned the uploaded content and the
+download was byte for byte identical. `gmi sandbox get ID` showed state `running`,
+product `gmi.sandbox.small`, started and ends. The timeout command moved the end
+time; without `--yes` and without a terminal it refused. After kill, `get` showed
+state `deleted`, code `Sandbox.UserDeleted`, message `Deleted by user request`
+and initiator `user`. No sandbox access token or traffic token appeared in output.
+The offline-tested fix in this update makes user deletion plain state for `get`,
+with no error line and exit code 0.
+
+On 22 October the platform deleted sandboxes with `Sandbox.BillingNoPermission`
+and initiator `billing`. GMI cleared this organization's permission issue on
+23 October. Accounts lacking purchase permission can still encounter this failure.
+gmi stops at the first platform deletion, reports its message, code and initiator
+and exits non-zero. Marketplace deployment and Cluster write operations remain
+unverified.
 
 ## `gmi serve`: HTTP chat service
 
@@ -564,7 +611,7 @@ Built in public, one working piece a day. The rule: nothing gets announced until
 | 1 | Tue 20 Oct | The interactive session, `gmi models`, `gmi chat`, login and config | **Shipped** |
 | 2 | Wed 21 Oct | `/image`, `/video` and `/audio` in the session, plus scriptable commands | **Shipped** |
 | 3 | Thu 22 Oct | Commands generated from GMI's four published OpenAPI specs | **Shipped** |
-| 4 | Fri 23 Oct | `gmi sandbox` and `gmi serve` | **Shipped: offline contracts and service tests.** Sandbox data plane unverified live. The image builds, runs and answers locally. Marketplace publication not done. |
+| 4 | Fri 23 Oct | `gmi sandbox` and `gmi serve` | **Shipped: sandbox run, create, exec, put, get-file, get, timeout and kill verified live by the owner on 23 October.** The service image was built and run locally on 22 October. Marketplace deployment and Cluster writes unverified. |
 | 5 | Sat 24 Oct | `gmi mcp serve`: every operation as an MCP tool for your agents | Planned |
 | 6 | Sun 25 Oct | v1.0: docs, install one-liner, good first issues | Planned |
 
@@ -572,7 +619,7 @@ Some of the GMI APIs need a different kind of API key than the inference key gmi
 
 ## How it's built
 
-Every line of code in this repository is written by [Codex CLI](https://github.com/openai/codex) running **`openai/gpt-6.1-sol` on GMI Cloud**, the same API gmi talks to. [`AGENTS.md`](AGENTS.md) is the contract it works from: the schedule, the verified API facts and the rules. Days 1 to 3 include live API checks. Day 4 has offline contract tests with live limits documented above. The interactive app tests use a pseudo-terminal.
+Every line of code in this repository is written by [Codex CLI](https://github.com/openai/codex) running **`openai/gpt-6.1-sol` on GMI Cloud**, the same API gmi talks to. [`AGENTS.md`](AGENTS.md) is the contract it works from: the schedule, the verified API facts and the rules. Days 1 to 3 include live API checks. Day 4 has offline contract tests and owner live verification with limits documented above. The interactive app tests use a pseudo-terminal.
 
 ## Development
 

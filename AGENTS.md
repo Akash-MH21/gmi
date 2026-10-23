@@ -59,7 +59,7 @@ be finished the day before.
   a per-sandbox `X-Access-Token` for its data plane. The Cluster Engine spec declares session-token auth only.
   Whether an API key works there is still an open question with GMI.
 
-## AgentBox facts (owner verified live on 2026-10-22)
+## AgentBox facts (owner verified live on 2026-10-22 and 2026-10-23)
 
 - Sandbox control plane auth uses a compute-scope key in `Authorization: Bearer`.
   Reuse the Day 3 resolver for `GMI_COMPUTE_API_KEY` or `GMI_SANDBOX_API_KEY`.
@@ -72,16 +72,42 @@ be finished the day before.
 - Template builds took 17 to 106 seconds. Poll every five seconds and stop on
   `ready` or `error`. Surface the build failure message. Template deletion is
   asynchronous and deleted templates can remain briefly in listings.
-- The platform deleted every sandbox about one second after creation with state
-  `deleting` then `deleted`. The deletion code was `Sandbox.BillingNoPermission`,
-  initiator `billing` and message `Deleted by the platform: billing order could
-  not be created because the organization is not permitted to purchase this product`.
-  Stop on the first deletion response, report its message, code and initiator,
-  exit non-zero and say this is not a gmi error. Never keep polling a deleted sandbox.
-- The data plane could not be reached live. Exec and files remain unverified live.
-  Day 4 implementation tests are offline only by owner instruction. No compute
-  key was available to this build and none was requested. Docker build, push,
-  AgentBox deployment, MaaS injection and marketplace approval are unverified.
+- On 22 October the platform deleted every sandbox about one second after
+  creation with state `deleting` then `deleted`. The code was
+  `Sandbox.BillingNoPermission`, initiator `billing` and message
+  `Deleted by the platform: billing order could not be created because the organization is not permitted to purchase this product`.
+  GMI cleared this organization's billing permission issue on 23 October and
+  sandboxes now stay up. Accounts lacking purchase permission can still see this
+  failure. Stop on the first platform deletion, report its message, code and
+  initiator and exit non-zero saying this is not a gmi error. Never keep polling
+  a deleted sandbox. Only initiators other than `user` are platform deletions.
+  `get` reports user deletion as plain state with no error line and exit code 0.
+- Owner verified live on 23 October at about 09:30 IST with the compute key from
+  a clean install of main: `gmi sandbox run --image ubuntu:24.04 --yes -- sh -c "echo hello-from-sandbox; uname -sr; id -un"`
+  printed `hello-from-sandbox`, `Linux 6.1.158+` and `root`, exited 0 in 18 seconds
+  and left no sandbox behind. The reusable template stayed.
+- `gmi sandbox create TEMPLATE --timeout 240 --wait --yes` printed
+  `created sandbox ID ends TIME`. `gmi sandbox exec ID -- sh -c "echo from-exec; pwd"`
+  printed `from-exec` and `/`. `gmi sandbox exec ID -- sh -c "echo oops >&2; exit 3"`
+  printed `oops` on stderr and gmi exited 3.
+- `gmi sandbox put ID LOCAL /tmp/in.txt` printed `uploaded LOCAL to /tmp/in.txt`.
+  `gmi sandbox exec ID -- cat /tmp/in.txt` returned the content.
+  `gmi sandbox get-file ID /tmp/in.txt --out OUT` printed
+  `downloaded /tmp/in.txt to OUT (22 bytes)` and the download was byte for byte identical.
+- `gmi sandbox get ID` showed state running, product `gmi.sandbox.small`, started
+  and ends. `gmi sandbox timeout ID 1200 --yes` printed `timeout set: ID ends TIME`
+  and moved the end time. Without `--yes` and without a terminal it refused.
+  `gmi sandbox kill ID --yes` printed `killing sandbox ID (accepted)`. After kill,
+  `get` showed state deleted, code `Sandbox.UserDeleted`, message
+  `Deleted by user request` and initiator `user`. No sandbox access token or
+  traffic token appeared in any output.
+- The data plane is verified live on 23 October for exactly the commands above.
+  Implementation tests in this update stay offline by owner instruction. No key
+  is available to this build and none is requested. The owner verified the local
+  Docker build and run on 22 October: non-root, healthy, 401 without the token,
+  a real chat answered and no key in logs. Still unverified: image push,
+  `gmi serve` on the AgentBox marketplace, GMI injecting the runtime key, gateway
+  access control, Verified approval and any Cluster write operation.
 
 ## Media API facts (verified live on 2026-10-20 with real generations)
 

@@ -1,10 +1,11 @@
 # AgentBox and the gmi service
 
-Day 4 adds sandbox commands and a small HTTP chat service. All new tests are
-offline. Control plane schemas come from `specs/sandbox_api.yaml` with the live
-findings supplied by the project owner on 22 October 2026. The commands that
-reach the control plane were run live on 22 October (see Verification below).
-The data plane is **unverified live**. No marketplace publication has happened.
+Day 4 adds sandbox commands and a small HTTP chat service. Implementation tests
+are offline. Control plane schemas come from `specs/sandbox_api.yaml` with live
+findings supplied by the project owner on 22 and 23 October 2026. The owner
+verified sandbox run, create, exec, put, get-file, get, timeout and kill live on
+23 October after GMI fixed the organization's billing permission. No marketplace
+publication has happened.
 
 ## Sandbox credentials and data centres
 
@@ -162,8 +163,11 @@ the command's exit code. Pending executions are polled until terminal with a
 
 ## Known platform billing deletion
 
-The owner observed every sandbox being deleted by the platform about one second
-after creation. The state became `deleting` then `deleted` with:
+On 22 October 2026 the owner observed every sandbox being deleted by the
+platform about one second after creation. GMI cleared this organization's billing
+permission issue on 23 October and sandboxes now stay up. This deletion can still
+happen when an account lacks purchase permission. The state became `deleting`
+then `deleted` with:
 
 ```text
 code: Sandbox.BillingNoPermission
@@ -171,12 +175,14 @@ initiator: billing
 message: Deleted by the platform: billing order could not be created because the organization is not permitted to purchase this product
 ```
 
-This is not a gmi error. gmi stops on the first response showing deletion, prints
-the service's message with its code and initiator and exits non-zero. It does not
-keep polling a deleted sandbox. The offline regression test proves this with one
-detail poll. The organization needs its purchase permission resolved with GMI
-before a live data plane test can proceed. This build did not request or obtain
-a compute key.
+This is not a gmi error. For a deletion whose initiator is not `user`, gmi stops
+on the first response showing deletion, prints the service's message with its
+code and initiator and exits non-zero. It does not keep polling a deleted
+sandbox. Offline regression tests cover this behaviour for create waits and run.
+For initiator `user`, `gmi sandbox get ID` reports plain state with no error line
+and exits 0. A wait interrupted by user deletion stops with the deletion reason
+without calling it a platform deletion. This build did not request or obtain a
+compute key and all tests in this update stay offline.
 
 ## HTTP service
 
@@ -235,7 +241,8 @@ docker build -t YOUR_REGISTRY/gmi-agentbox:day4 .
 docker push YOUR_REGISTRY/gmi-agentbox:day4
 ```
 
-Neither command was run in this build. No registry credentials are available.
+The owner verified a local Docker build and run on 22 October. Registry push
+remains unverified. No registry credentials are available to this build.
 For a local container test, pass secrets through the runtime environment:
 
 ```sh
@@ -278,13 +285,61 @@ redaction and upstream failures. They inspect the configured timeout without
 waiting 30 seconds.
 
 Verified on 22 October: the live catalogue and template calls, a one-shot run that
-stops with the platform's billing message and a local Docker build and run of the
-service image (non-root user, healthy, 401 without the token, a real chat answered
-through GMI, no key in the logs). Not verified: a running sandbox, exec, file
-transfer, registry push, marketplace submission, MaaS key injection, gateway access
-control and Verified approval. The data plane is unverified live because the
-platform deleted every sandbox for lack of billing permission before it could be
-reached.
+stopped with the platform's billing message and a local Docker build and run of
+the service image (non-root user, healthy, 401 without the token, a real chat
+answered through GMI, no key in the logs).
+
+Owner verified live on 23 October 2026 at about 09:30 IST with a compute key
+from a clean install of main, after GMI fixed the organization's billing permission:
+
+```text
+$ gmi sandbox run --image ubuntu:24.04 --yes -- sh -c "echo hello-from-sandbox; uname -sr; id -un"
+hello-from-sandbox
+Linux 6.1.158+
+root
+```
+
+The run exited 0 in 18 seconds and left no sandbox behind. The reusable template
+stayed. The owner also verified these commands (ID, TEMPLATE, TIME, LOCAL and OUT
+are placeholders for the reported values):
+
+```text
+$ gmi sandbox create TEMPLATE --timeout 240 --wait --yes
+created sandbox ID ends TIME
+
+$ gmi sandbox exec ID -- sh -c "echo from-exec; pwd"
+from-exec
+/
+
+$ gmi sandbox exec ID -- sh -c "echo oops >&2; exit 3"
+oops
+
+$ gmi sandbox put ID LOCAL /tmp/in.txt
+uploaded LOCAL to /tmp/in.txt
+
+$ gmi sandbox get-file ID /tmp/in.txt --out OUT
+downloaded /tmp/in.txt to OUT (22 bytes)
+
+$ gmi sandbox timeout ID 1200 --yes
+timeout set: ID ends TIME
+
+$ gmi sandbox kill ID --yes
+killing sandbox ID (accepted)
+```
+
+The failing exec printed `oops` on stderr and gmi exited 3.
+`gmi sandbox exec ID -- cat /tmp/in.txt` returned the uploaded content and the
+download was byte for byte identical. `gmi sandbox get ID` showed state `running`,
+product `gmi.sandbox.small`, started and ends. The timeout command moved the end
+time; without `--yes` and without a terminal it refused. After kill, `get` showed
+state `deleted`, code `Sandbox.UserDeleted`, message `Deleted by user request`
+and initiator `user`. No sandbox access token or traffic token appeared in output.
+The offline-tested fix in this update makes user deletion plain state for `get`,
+with no error line and exit code 0.
+
+Still not verified: `gmi serve` on the AgentBox marketplace, including image
+push, GMI injecting the runtime key, gateway access control and Verified approval.
+Any Cluster write operation also remains unverified.
 
 ```sh
 .venv/bin/pytest -q -m 'not live and not live_media'
@@ -307,9 +362,9 @@ Exit 0, generated manifest unchanged
 
 This includes 81 new offline cases beyond the previous 60 tests. No new live
 tests were added or run. `git diff --check` also passed. Docker build and push
-were not run. Work stayed on `day4` without a merge or push.
+were not run in that implementation session; the owner separately verified the
+local Docker build and run on 22 October. Work stayed on `day4` without a merge or push.
 
-Next: the account owner resolves the platform purchase permission, then validates
-sandbox operations against the live control and data planes. Build and publish
-the image only with registry access and validate MaaS injection before seeking
-marketplace approval.
+Next: validate image push, AgentBox deployment, runtime key injection and gateway
+access control before seeking marketplace approval. Cluster writes remain
+unverified.
