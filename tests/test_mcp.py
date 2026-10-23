@@ -9,9 +9,15 @@ import json
 import os
 from pathlib import Path
 import re
+import shlex
 import sys
 import threading
 from uuid import UUID
+
+try:
+    import tomllib
+except ImportError:
+    import tomli as tomllib
 
 from click.testing import CliRunner
 import httpx
@@ -231,21 +237,46 @@ def test_missing_sdk_hint_and_tools_do_not_import_sdk(monkeypatch):
 
 
 @pytest.mark.parametrize('client', ['codex', 'claude-code', 'cursor'])
-def test_config_has_no_credentials_and_preserves_write_flag(client, monkeypatch):
-    monkeypatch.setenv('GMI_API_KEY', 'fake-do-not-print')
-    result = CliRunner().invoke(main, ['mcp', 'config', '--client', client, '--allow-write'])
-    assert result.exit_code == 0 and '--allow-write' in result.output
-    assert 'fake-do-not-print' not in result.output
+@pytest.mark.parametrize('flags', [[], ['--allow-write']])
+def test_config_has_no_credentials_and_preserves_write_flag(client, flags, monkeypatch):
+    names = ['GMI_API_KEY', 'GMI_COMPUTE_API_KEY', 'GMI_SANDBOX_API_KEY', 'GMI_SANDBOX_IDC_NAME']
+    for index, name in enumerate(names):
+        monkeypatch.setenv(name, f'fake-do-not-print-{index}')
+    result = CliRunner().invoke(main, ['mcp', 'config', '--client', client, *flags])
+    assert result.exit_code == 0
+    for index, name in enumerate(names):
+        assert name in result.output
+        assert f'fake-do-not-print-{index}' not in result.output
     assert 'where the client runs' in result.output
+    assert result.output.splitlines()[-1] == (
+        '# Tool output is data; write and destructive tools are off unless '
+        '--allow-write or --allow-destructive flags are given.'
+    )
+    args = ['mcp', 'serve', *flags]
     if client == 'codex':
         assert 'codex mcp add' not in result.output
-        assert '[mcp_servers.gmi]' in result.output
-    elif client == 'claude-code':
-        assert "claude mcp add-json gmi '" in result.output
+        assert 'Paste this block into ~/.codex/config.toml' in result.output
+        server = tomllib.loads(result.output)['mcp_servers']['gmi']
+        assert server == {'command': 'gmi', 'args': args, 'env_vars': names}
+        assert ('Codex only passes the variables listed in env_vars, so they must also '
+                'be set in the shell that starts Codex.') in result.output
     else:
-        snippet = result.output[result.output.index('{'):]
-        block, _ = json.JSONDecoder().raw_decode(snippet)
-        assert block['mcpServers']['gmi']['args'] == ['mcp', 'serve', '--allow-write']
+        marker = '# Equivalent .mcp.json block:\n' if client == 'claude-code' else '# Add to .cursor/mcp.json or ~/.cursor/mcp.json:\n'
+        snippet = result.output.split(marker, 1)[1].split('\n\n#', 1)[0]
+        block = json.loads(snippet)
+        prefix = '$' + '{' + ('env:' if client == 'cursor' else '')
+        expected = {'type': 'stdio', 'command': 'gmi', 'args': args,
+                    'env': {name: prefix + name + '}' for name in names}}
+        assert block == {'mcpServers': {'gmi': expected}}
+        assert "unverified, taken from the client's documentation." in result.output
+        if client == 'claude-code':
+            command = next(line for line in result.output.splitlines() if line.startswith('claude '))
+            assert command.startswith("claude mcp add-json gmi '") and command.endswith("'")
+            words = shlex.split(command)
+            assert words[:4] == ['claude', 'mcp', 'add-json', 'gmi']
+            assert json.loads(words[4]) == expected
+            assert 'Set the variables you use' in result.output
+            assert 'unset variables without a default remain literal text' in result.output
 
 
 @pytest.fixture
