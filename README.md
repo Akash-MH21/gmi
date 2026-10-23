@@ -560,6 +560,8 @@ writes no key to its logs. Pushing the image, GMI injecting the runtime key and
 the five marketplace wizard steps ([docs/AGENTBOX.md](docs/AGENTBOX.md)) have not
 been done.
 
+After the hackathon results are announced, gmi will be deployed on the AgentBox marketplace; until then the Docker image has only been built and run locally.
+
 ## Configuration and privacy
 
 | Path | Contents |
@@ -614,6 +616,8 @@ Built in public, one working piece a day. The rule: nothing gets announced until
 | 4 | Fri 23 Oct | `gmi sandbox` and `gmi serve` | **Shipped: sandbox run, create, exec, put, get-file, get, timeout and kill verified live by the owner on 23 October.** The service image was built and run locally on 22 October. Marketplace deployment and Cluster writes unverified. |
 | 5 | Sat 24 Oct | `gmi mcp serve`: every operation as an MCP tool for your agents | Planned |
 | 6 | Sun 25 Oct | v1.0: docs, install one-liner, good first issues | Planned |
+
+After the hackathon results are announced, gmi will be deployed on the AgentBox marketplace; until then the Docker image has only been built and run locally.
 
 Some of the GMI APIs need a different kind of API key than the inference key gmi uses today. Where that limits what can be verified, the day's write-up will say so rather than claim more.
 

@@ -251,6 +251,8 @@ docker run --rm -p 8080:8080 \
   YOUR_REGISTRY/gmi-agentbox:day4
 ```
 
+After the hackathon results are announced, gmi will be deployed on the AgentBox marketplace; until then the Docker image has only been built and run locally.
+
 ## Marketplace wizard: five steps
 
 The following values are a registration guide. The wizard and its current field
