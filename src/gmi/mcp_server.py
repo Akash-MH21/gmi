@@ -160,7 +160,89 @@ def select_tools(services='iam,idc,sandbox,cluster', allow_write=False, allow_de
 
 
 def curated_tools():
-    return []
+    string = {'type': 'string', 'minLength': 1}
+    command = {'type': 'array', 'items': string, 'minItems': 1}
+    seconds = {'type': 'integer', 'minimum': 1, 'maximum': 300, 'default': 300}
+    definitions = [
+        ('gmi_models', 'read', 'inference', 'List text models. Optional search matches model fields; limit defaults to 50.',
+         {'search': {'type': 'string'}, 'limit': {'type': 'integer', 'minimum': 1, 'maximum': 1000, 'default': 50}}, []),
+        ('gmi_chat', 'read', 'inference', 'Send one message using the inference key. Costs tokens despite the read class. Returns reply and usage.',
+         {'message': string, 'model': string, 'max_tokens': {'type': 'integer', 'minimum': 1, 'maximum': 1024, 'default': 256}}, ['message']),
+        ('gmi_sandbox_run', 'write', 'sandbox', 'Run a command in billable compute, creating a reusable image template if needed. Always attempts to kill the sandbox, including on failure. Leaves the template for reuse.',
+         {'image': string, 'command': command, 'product': string, 'timeout': seconds}, ['image', 'command']),
+        ('gmi_sandbox_exec', 'write', 'sandbox', 'Execute a command in an existing sandbox. Connects internally without exposing access tokens. A timed out command may still be running.',
+         {'sandbox_id': string, 'command': command, 'timeout': seconds}, ['sandbox_id', 'command']),
+        ('gmi_sandbox_put_file', 'write', 'sandbox', 'Write UTF-8 content to a sandbox path, overwriting it. Maximum 256 KB. Connects internally; cannot read host files.',
+         {'sandbox_id': string, 'path': string, 'content': {'type': 'string', 'maxLength': 262144}}, ['sandbox_id', 'path', 'content']),
+        ('gmi_sandbox_get_file', 'read', 'sandbox', 'Read a UTF-8 file from an existing sandbox. Maximum 256 KB. Connects internally without exposing access tokens; use the CLI for binary or larger files.',
+         {'sandbox_id': string, 'path': string}, ['sandbox_id', 'path']),
+    ]
+    return [{'name': name, 'class': kind, 'service': service, 'curated': True,
+             'description': description + f' Class: {kind}; curated.',
+             'inputSchema': {'type': 'object', 'properties': props, 'required': required, 'additionalProperties': False},
+             'annotations': {'readOnlyHint': kind == 'read', 'destructiveHint': False,
+                             'idempotentHint': name in ('gmi_models', 'gmi_sandbox_get_file'), 'openWorldHint': True}}
+            for name, kind, service, description, props, required in definitions]
+
+
+def execute_curated(name, arguments, timeout):
+    from .config import resolve_key, resolve_model
+    if name in ('gmi_models', 'gmi_chat'):
+        key = resolve_key()
+        with httpx.Client(base_url=test_base('https://api.gmi-serving.com/v1') + '/', timeout=timeout,
+                          headers={'Authorization': 'Bearer ' + key, 'User-Agent': f'gmi-mcp/{__version__}'}) as client:
+            if name == 'gmi_models':
+                response = client.get('models')
+            else:
+                model = arguments.get('model') or resolve_model(None)
+                field = 'max_completion_tokens' if model.partition('/')[0] == 'openai' else 'max_tokens'
+                response = client.post('chat/completions', json={'model': model,
+                    'messages': [{'role': 'user', 'content': arguments['message']}],
+                    field: arguments.get('max_tokens', 256), 'stream': False})
+        from .api import check_response
+        check_response(response, arguments.get('model', '<default>'))
+        value = response.json()
+        if name == 'gmi_models':
+            search = arguments.get('search', '').casefold()
+            rows = [row for row in value.get('data', []) if search in json.dumps(row).casefold()]
+            return {'models': rows[:arguments.get('limit', 50)], 'total': len(rows)}
+        return {'reply': value['choices'][0]['message'].get('content') or '', 'usage': value.get('usage', {})}
+
+    from .sandbox import SandboxClient
+    client = SandboxClient()
+    client.http.headers['User-Agent'] = f'gmi-mcp/{__version__}'
+    client.http.timeout = httpx.Timeout(timeout)
+    try:
+        seconds = arguments.get('timeout', 300)
+        if name == 'gmi_sandbox_run':
+            value = client.run_once(arguments['image'], arguments['command'],
+                                    product=arguments.get('product', 'gmi.sandbox.small'), timeout=seconds,
+                                    wait_timeout=seconds)
+        elif name == 'gmi_sandbox_exec':
+            value = client.execute(arguments['sandbox_id'], arguments['command'], timeout=seconds)
+        else:
+            connection = client.connect(arguments['sandbox_id'])
+            if name == 'gmi_sandbox_put_file':
+                content = arguments['content'].encode('utf-8')
+                if len(content) > 262144:
+                    raise GMIError('File exceeds the 256 KB tool limit.')
+                value = client.data('POST', '/files', connection=connection, params={'path': arguments['path']},
+                                    files={'file': ('upload.txt', content, 'application/octet-stream')})
+            else:
+                content = client.request('GET', '/files', connection=connection, params={'path': arguments['path']},
+                                         binary=True, max_bytes=262144)
+                try:
+                    text = content.decode('utf-8')
+                except UnicodeDecodeError:
+                    raise GMIError('Binary file omitted; use gmi sandbox get-file.') from None
+                value = {'content': text, 'bytes': len(content)}
+        if name in ('gmi_sandbox_run', 'gmi_sandbox_exec'):
+            value = {key: value.get(key) for key in ('stdout', 'stderr', 'exit_code')}
+        return client.scrub(value)
+    except GMIError as error:
+        raise GMIError(client.scrub(str(error))) from None
+    finally:
+        client.close()
 
 
 def test_base(default):

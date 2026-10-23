@@ -79,7 +79,7 @@ class SandboxClient:
             for v in value:
                 self._remember(v)
 
-    def request(self, method, path, *, connection=None, binary=False, **kwargs):
+    def request(self, method, path, *, connection=None, binary=False, max_bytes=None, **kwargs):
         headers = kwargs.pop('headers', {})
         if connection:
             base = f"https://{connection['sandbox_key']}.{connection['domain']}"
@@ -88,6 +88,16 @@ class SandboxClient:
             base = BASE_URL
             headers['Authorization'] = 'Bearer ' + self.key
         try:
+            if binary and max_bytes is not None:
+                with self.http.stream(method, base + path, headers=headers, **kwargs) as response:
+                    if response.status_code >= 400:
+                        raise SandboxHTTPError(response.status_code)
+                    content = bytearray()
+                    for chunk in response.iter_bytes(chunk_size=16384):
+                        content.extend(chunk)
+                        if len(content) > max_bytes:
+                            raise GMIError('File exceeds the 256 KB tool limit; use gmi sandbox get-file.')
+                    return bytes(content)
             response = self.http.request(method, base + path, headers=headers, **kwargs)
         except httpx.RequestError:
             raise GMIError('Sandbox network request failed; check connectivity and retry.') from None
@@ -193,6 +203,40 @@ class SandboxClient:
         if value.get('exit_code') is None:
             raise GMIError('Execution ended without a process exit code; inspect the sandbox.')
         return value
+
+    def run_once(self, image, command, product="gmi.sandbox.small", idc_name=None, timeout=300, wait_timeout=None):
+        """Run one command and always attempt sandbox cleanup. Keep reusable templates."""
+        wait_options = {} if wait_timeout is None else {"timeout": wait_timeout}
+        name = 'gmi-run-' + hashlib.sha256((image + '\0' + product).encode()).hexdigest()[:16]
+        template_id = None
+        for row in self.pages('/templates', idc_selection(idc_name)):
+            if row.get('name') == name and row.get('latest_build_status') == 'ready':
+                build = self.data('GET', f"/templates/{component(row['id'])}/builds/{component(row['latest_build_id'])}")
+                source = build.get('source') or {}
+                if source.get('image') == image and build.get('product', row.get('product')) == product:
+                    template_id = row['id']
+                    break
+        if template_id is None:
+            template = self.create_template(name, image, product, idc_name=idc_name)
+            template_id = template['id']
+            self.wait_template(template_id, **wait_options)
+        sandbox_id = None
+        try:
+            box = self.create_sandbox(template_id, timeout, idc_name=idc_name)
+            sandbox_id = box['id']
+            self.wait_sandbox(sandbox_id, **wait_options)
+            result = self.execute(sandbox_id, command, **wait_options)
+        finally:
+            if sandbox_id:
+                pending_error = sys.exc_info()[0] is not None
+                try:
+                    self.data('DELETE', f'/sandboxes/{component(sandbox_id)}')
+                except GMIError as error:
+                    click.echo(self.scrub(f'Cleanup failed for sandbox {sandbox_id}: {error}. Run gmi sandbox kill {sandbox_id} --yes.'), err=True)
+                    # Do not replace an execution error or Ctrl+C with a cleanup error.
+                    if not pending_error:
+                        raise
+        return result
 
     def estimate(self, idc_name=None, product=None):
         try:
@@ -558,33 +602,5 @@ def sandbox_get_file(client, as_json, sandbox_id, remote, output, username):
 def sandbox_run(client, as_json, image, product, idc_name, timeout, yes, command):
     client.estimate(idc_name, product)
     confirm(yes, as_json, 'Build a template and run a billable sandbox, then kill it?')
-    name = 'gmi-run-' + hashlib.sha256((image + '\0' + product).encode()).hexdigest()[:16]
-    template_id = None
-    for row in client.pages('/templates', idc_selection(idc_name)):
-        if row.get('name') == name and row.get('latest_build_status') == 'ready':
-            build = client.data('GET', f"/templates/{component(row['id'])}/builds/{component(row['latest_build_id'])}")
-            source = build.get('source') or {}
-            if source.get('image') == image and build.get('product', row.get('product')) == product:
-                template_id = row['id']
-                break
-    if template_id is None:
-        template = client.create_template(name, image, product, idc_name=idc_name)
-        template_id = template['id']
-        client.wait_template(template_id)
-    sandbox_id = None
-    try:
-        box = client.create_sandbox(template_id, timeout, idc_name=idc_name)
-        sandbox_id = box['id']
-        client.wait_sandbox(sandbox_id)
-        result = client.execute(sandbox_id, command)
-    finally:
-        if sandbox_id:
-            pending_error = sys.exc_info()[0] is not None
-            try:
-                client.data('DELETE', f'/sandboxes/{component(sandbox_id)}')
-            except GMIError as error:
-                click.echo(client.scrub(f'Cleanup failed for sandbox {sandbox_id}: {error}. Run gmi sandbox kill {sandbox_id} --yes.'), err=True)
-                # Do not replace an execution error or Ctrl+C with a cleanup error.
-                if not pending_error:
-                    raise
+    result = client.run_once(image, command, product, idc_name, timeout)
     execution_output(client, result, as_json)
