@@ -402,3 +402,6 @@ main.add_command(sandbox_group)
 
 from .serve import serve_command
 main.add_command(serve_command)
+
+from .mcp_server import mcp_group
+main.add_command(mcp_group)

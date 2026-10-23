@@ -12,7 +12,8 @@ license = "Apache-2.0"
 dependencies = ["click==8.1.8", "httpx==0.28.1", "prompt_toolkit==3.0.52", "rich==14.2.0", "tomli==2.2.1; python_version < '3.11'"]
 
 [project.optional-dependencies]
-test = ["pytest==8.3.5", "pexpect==4.9.0", "pyte==0.8.2", "pyyaml==6.0.2"]
+mcp = ["mcp==2.3.0"]
+test = ["mcp==2.3.0", "pytest==8.3.5", "pexpect==4.9.0", "pyte==0.8.2", "pyyaml==6.0.2"]
 
 [project.scripts]
 gmi = "gmi.cli:main"
