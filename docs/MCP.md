@@ -262,6 +262,6 @@ env -u GMI_API_KEY -u GMI_TOKEN -u GMI_COMPUTE_API_KEY -u GMI_SANDBOX_API_KEY \
 .venv/bin/python tools/gen_api.py --check
 ```
 
-Both suite runs passed: 228 passed with 9 live tests deselected. The manifest
-check passed. The 32 new MCP tests include both protocol versions. Tool counts
-were rechecked with `gmi mcp tools --json` for all three permission settings.
+Both suite runs passed: 266 passed with 9 live tests deselected. The manifest
+check passed. Client configuration tests parse the TOML and JSON, check server
+arguments and confirm that environment values never appear in the output.
