@@ -10,6 +10,7 @@ import os
 from pathlib import Path
 import re
 import shlex
+import subprocess
 import sys
 import threading
 from uuid import UUID
@@ -234,6 +235,24 @@ def test_missing_sdk_hint_and_tools_do_not_import_sdk(monkeypatch):
     assert result.stderr.strip() == 'MCP SDK missing; install with: pip install "gmi[mcp] @ git+https://github.com/zkasuran/gmi"'
     assert len(result.stderr.splitlines()) == 1
     assert runner.invoke(main, ['mcp', 'tools', '--json']).exit_code == 0
+
+
+def test_no_pypi_only_mcp_install_commands_in_user_facing_files():
+    root = Path(__file__).parents[1]
+    tracked = subprocess.run(
+        ['git', 'ls-files', '--', 'README*', 'docs/**/*.md', 'src/gmi/*.py'],
+        cwd=root,
+        check=True,
+        capture_output=True,
+        text=True,
+    ).stdout.splitlines()
+    forbidden = ("pip install 'gmi[", 'pip install "gmi[mcp]"')
+    offenders = []
+    for name in tracked:
+        text = (root / name).read_text()
+        if any(marker in text for marker in forbidden):
+            offenders.append(name)
+    assert offenders == []
 
 
 @pytest.mark.parametrize('client', ['codex', 'claude-code', 'cursor'])
