@@ -370,3 +370,26 @@ local Docker build and run on 22 October. Work stayed on `day4` without a merge 
 Next: validate image push, AgentBox deployment, runtime key injection and gateway
 access control before seeking marketplace approval. Cluster writes remain
 unverified.
+
+## 23 October offline update validation
+
+The `day4d` update fixes user-deletion reporting and records the owner's live
+verification and marketplace deployment plan. All checks in this session were
+offline. The final suite ran twice:
+
+```text
+.venv/bin/pytest -q -m 'not live and not live_media'
+Run 1: 196 passed, 9 deselected in 4.05s
+Run 2: 196 passed, 9 deselected in 3.64s
+
+.venv/bin/python tools/gen_api.py --check
+Exit 0, generated manifest unchanged
+```
+
+The six added cases cover user deletion in text and JSON get output and stopping
+create and run waits without platform wording. Existing platform-deletion cases
+remain green. `git diff --check` passed. No key or live API was used. Work stayed
+on `day4d` without a merge or push. The marketplace service, image push, runtime
+key injection, gateway access control, Verified approval and Cluster writes
+remain unverified. Next: follow the deployment plan after hackathon results and
+validate those marketplace steps before seeking approval.
