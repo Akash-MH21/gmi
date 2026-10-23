@@ -45,7 +45,7 @@ GMI Cloud has an OpenAI-compatible API, a Model Hub and a web console. `gmi` add
 - **Careful with your key.** Hidden prompt, verified before it is saved, stored with mode 600, never printed.
 
 > [!NOTE]
-> **Status: Day 4 of a six-day public build (20 to 25 Oct 2026).** Days 1 to 3 include live API verification. The owner verified sandbox run, create, exec, file transfer, get, timeout and kill live on 23 October. The service image was built and run locally on 22 October. Marketplace deployment and Cluster writes remain unverified. See the [roadmap](#roadmap) for scope and verification limits.
+> **Status: Day 5 of a six-day public build (20 to 25 Oct 2026).** Days 1 to 3 include live API verification. The owner verified sandbox run, create, exec, file transfer, get, timeout and kill live on 23 October. The service image was built and run locally on 22 October. The MCP stdio server passes offline tests for both protocol eras; real agent clients remain unverified. Marketplace deployment and Cluster writes remain unverified. See the [roadmap](#roadmap) for scope and verification limits.
 
 ## Install
 
@@ -562,6 +562,73 @@ been done.
 
 After the hackathon results are announced, gmi will be deployed on the AgentBox marketplace; until then the Docker image has only been built and run locally.
 
+## `gmi mcp serve`
+
+Let an agent use GMI Cloud through MCP tools over local stdio. Install the optional
+SDK extra, preview the tools then configure your agent client:
+
+```sh
+pip install 'gmi[mcp]'
+gmi mcp tools
+gmi mcp tools --allow-write --json
+gmi mcp config --client codex
+```
+
+The official Python SDK `mcp==2.3.0` handles protocol revision 2026-07-28 and
+older initialize handshakes. Both gmi and the SDK require Python 3.10 or newer.
+The core install stays light: `mcp tools` and `mcp config` work without the SDK.
+`mcp serve` prints an install hint to stderr and exits 2 when it is missing.
+
+| Class | Enabled by | What an agent can do |
+|---|---|---|
+| Read | Default | Call generated GET tools, list models, chat and read small sandbox files. Chat costs tokens. |
+| Write | `--allow-write` | Call generated POST, PUT and PATCH tools or run sandbox commands and write files. May create billable compute. |
+| Destructive | `--allow-destructive` | Call generated DELETE tools. Also enables writes. |
+| Curated | Each tool's read or write gate | Use handwritten inference and sandbox tools. Sandbox tools resolve connection secrets internally. One-shot run always attempts to kill its sandbox but keeps the reusable template. |
+
+There are 36 tools by default, 78 with writes and 90 with destructive operations.
+Curated tools are included in these totals. Service and tool-name glob filters
+can reduce the surface. The launch flags are operator consent for subsequent
+calls; tools do not prompt on stdin.
+
+Raw sandbox data-plane operations, API key creation, email verification token
+operations and IAM OAuth operations are never exposed. These need secrets or
+create credentials that should not pass through the model. Curated sandbox
+file tools accept UTF-8 content up to 256 KB and cannot read host files.
+
+Every result redacts values under field names containing `token`, `secret`,
+`password` or `api_key`, ignoring case, plus JWT-shaped strings and known
+credentials. This includes fields such as `total_tokens`. Output is capped at
+65536 bytes by default with a truncation marker. Binary responses return a note.
+The server tells agents that tool output is untrusted data, never instructions.
+This prompt-injection instruction does not make returned content trustworthy.
+
+Set environment variables where the client runs: `GMI_API_KEY` for inference
+and `GMI_COMPUTE_API_KEY` or `GMI_SANDBOX_API_KEY` with compute scope for sandbox
+and Cluster tools. Keys never appear in configuration snippets.
+
+Copied from `gmi mcp config --client codex`. Use the command or the TOML block:
+
+```text
+# Set environment variables where the client runs: GMI_API_KEY for inference;
+# GMI_COMPUTE_API_KEY or GMI_SANDBOX_API_KEY for compute scope.
+codex mcp add gmi -- gmi mcp serve
+
+# Equivalent ~/.codex/config.toml block:
+[mcp_servers.gmi]
+command = "gmi"
+args = ["mcp", "serve"]
+```
+
+Also available: `gmi mcp config --client claude-code` and
+`gmi mcp config --client cursor`. Add `--allow-write` to opt in to writes.
+
+The new MCP paths are tested offline with official SDK clients using both
+protocol eras. Use with real agent clients remains unverified; the operator
+will test Codex live. Streamable HTTP transport, MCP resources and MCP prompts
+are not implemented. See [the MCP reference](docs/MCP.md) for every flag,
+exact class counts and the operator check procedure.
+
 ## Configuration and privacy
 
 | Path | Contents |
@@ -614,7 +681,7 @@ Built in public, one working piece a day. The rule: nothing gets announced until
 | 2 | Wed 21 Oct | `/image`, `/video` and `/audio` in the session, plus scriptable commands | **Shipped** |
 | 3 | Thu 22 Oct | Commands generated from GMI's four published OpenAPI specs | **Shipped** |
 | 4 | Fri 23 Oct | `gmi sandbox` and `gmi serve` | **Shipped: sandbox run, create, exec, put, get-file, get, timeout and kill verified live by the owner on 23 October.** The service image was built and run locally on 22 October. Marketplace deployment and Cluster writes unverified. |
-| 5 | Sat 24 Oct | `gmi mcp serve`: every operation as an MCP tool for your agents | Planned |
+| 5 | Sat 24 Oct | `gmi mcp serve`: gated API and curated tools for agents | Offline tested with SDK clients for 2026-07-28 and 2025-11-25; real clients unverified |
 | 6 | Sun 25 Oct | v1.0: docs, install one-liner, good first issues | Planned |
 
 After the hackathon results are announced, gmi will be deployed on the AgentBox marketplace; until then the Docker image has only been built and run locally.

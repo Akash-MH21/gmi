@@ -109,6 +109,41 @@ be finished the day before.
   `gmi serve` on the AgentBox marketplace, GMI injecting the runtime key, gateway
   access control, Verified approval and any Cluster write operation.
 
+## MCP facts (offline verified 2026-10-23)
+
+- `gmi mcp serve` uses the official optional `mcp==2.3.0` SDK over stdio.
+  Install with `pip install "gmi[mcp]"`. Both project and SDK require Python 3.10+.
+  The SDK v2 low-level server owns the protocol. Types live in `mcp_types`.
+  Official SDK client subprocess tests cover 2026-07-28 metadata requests and
+  the older 2025-11-25 initialize handshake. Real agent clients are unverified.
+- `gmi mcp tools [--json]` needs no SDK or credentials. Current unfiltered counts:
+  default 36 read, 0 write, 0 destructive (3 curated; 36 total);
+  `--allow-write` 36 read, 42 write, 0 destructive (6 curated; 78 total);
+  `--allow-destructive` 36 read, 42 write, 12 destructive (6 curated; 90 total).
+  Curated counts are subsets. Recompute after manifest changes.
+- Nine manifest operations are excluded: five sandbox data-plane operations,
+  create-api-key, two email verification token operations and one IAM OAuth
+  operation. Curated sandbox tools connect internally and never return access
+  tokens. The default read set includes gmi_sandbox_get_file.
+- The launch permission flags replace interactive confirmation for MCP calls.
+  One-shot sandbox cleanup is included in write consent. Shared SandboxClient
+  run_once preserves the CLI behavior and always attempts sandbox cleanup.
+  File tools accept UTF-8 content with a 256 KB cap and never read host files.
+- All tool results redact token, secret, password and api_key fields ignoring
+  case, JWT-shaped strings and known credentials. This includes token usage
+  counters. The default text cap is 65536 bytes; truncated structured content
+  is omitted. Output is untrusted data, never instructions. Stdout is protocol
+  only. Generated HTTP requests reuse the Day 3 builder and credential resolver.
+- `GMI_MCP_TEST_BASE` redirects generated and inference HTTP calls only when
+  `GMI_MCP_TEST_MODE=1`. These are test-only variables. Curated sandbox tests use
+  a local transport fixture. For offline verification explicitly exclude live
+  markers with `pytest -m "not live and not live_media"`, even if an ambient
+  credential is present. Never infer that the environment contains no key.
+- Client configuration syntax was checked against official Codex, Claude Code
+  and Cursor documentation. Real client use and all MCP calls against GMI are
+  unverified. Streamable HTTP transport, resources, prompts and mcp login are
+  not implemented. See docs/MCP.md for flags and the operator check procedure.
+
 ## Media API facts (verified live on 2026-10-20 with real generations)
 
 - Base: `https://console.gmicloud.ai/api/v1/ie/requestqueue/apikey`. Same `Authorization: Bearer <API key>` and
