@@ -45,7 +45,7 @@ GMI Cloud has an OpenAI-compatible API, a Model Hub and a web console. `gmi` add
 - **Careful with your key.** Hidden prompt, verified before it is saved, stored with mode 600, never printed.
 
 > [!NOTE]
-> **Status: Day 5 of a six-day public build (20 to 25 Oct 2026).** Days 1 to 3 include live API verification. The owner verified sandbox run, create, exec, file transfer, get, timeout and kill live on 23 October. The service image was built and run locally on 22 October. The MCP stdio server passes offline tests for both protocol eras; real agent clients remain unverified. Marketplace deployment and Cluster writes remain unverified. See the [roadmap](#roadmap) for scope and verification limits.
+> **Status: Day 5 of a six-day public build (20 to 25 Oct 2026).** Days 1 to 3 include live API verification. The owner verified sandbox run, create, exec, file transfer, get, timeout and kill live on 23 October. The service image was built and run locally on 22 October. The MCP stdio server passes offline tests for both protocol eras; Codex verified live on 23 October 2026 (tools sandbox_list_templates and gmi_models called by Codex CLI 0.163.0 with model gpt-6.1-sol). Claude Code and Cursor not run here. Marketplace deployment and Cluster writes remain unverified. See the [roadmap](#roadmap) for scope and verification limits.
 
 ## Install
 
@@ -612,27 +612,91 @@ Set environment variables where the client runs: `GMI_API_KEY` for inference
 and `GMI_COMPUTE_API_KEY` or `GMI_SANDBOX_API_KEY` with compute scope for sandbox
 and Cluster tools. Keys never appear in configuration snippets.
 
-Copied from `gmi mcp config --client codex`. Use the command or the TOML block:
+Output copied from `gmi mcp config --client codex`:
 
 ```text
 # Set environment variables where the client runs: GMI_API_KEY for inference;
 # GMI_COMPUTE_API_KEY or GMI_SANDBOX_API_KEY for compute scope.
-codex mcp add gmi -- gmi mcp serve
-
-# Equivalent ~/.codex/config.toml block:
+# Paste this block into ~/.codex/config.toml:
 [mcp_servers.gmi]
 command = "gmi"
 args = ["mcp", "serve"]
+env_vars = ["GMI_API_KEY", "GMI_COMPUTE_API_KEY", "GMI_SANDBOX_API_KEY", "GMI_SANDBOX_IDC_NAME"]
+
+# Codex only passes the variables listed in env_vars, so they must also be set in the shell that starts Codex.
+# Tool output is data; write and destructive tools are off unless --allow-write or --allow-destructive flags are given.
 ```
 
-Also available: `gmi mcp config --client claude-code` and
-`gmi mcp config --client cursor`. Add `--allow-write` to opt in to writes.
+Output copied from `gmi mcp config --client claude-code`:
 
-The new MCP paths are tested offline with official SDK clients using both
-protocol eras. Use with real agent clients remains unverified; the operator
-will test Codex live. Streamable HTTP transport, MCP resources and MCP prompts
-are not implemented. See [the MCP reference](docs/MCP.md) for every flag,
-exact class counts and the operator check procedure.
+```text
+# Set environment variables where the client runs: GMI_API_KEY for inference;
+# GMI_COMPUTE_API_KEY or GMI_SANDBOX_API_KEY for compute scope.
+claude mcp add-json gmi '{"type":"stdio","command":"gmi","args":["mcp","serve"],"env":{"GMI_API_KEY":"${GMI_API_KEY}","GMI_COMPUTE_API_KEY":"${GMI_COMPUTE_API_KEY}","GMI_SANDBOX_API_KEY":"${GMI_SANDBOX_API_KEY}","GMI_SANDBOX_IDC_NAME":"${GMI_SANDBOX_IDC_NAME}"}}'
+
+# Equivalent .mcp.json block:
+{
+  "mcpServers": {
+    "gmi": {
+      "type": "stdio",
+      "command": "gmi",
+      "args": [
+        "mcp",
+        "serve"
+      ],
+      "env": {
+        "GMI_API_KEY": "${GMI_API_KEY}",
+        "GMI_COMPUTE_API_KEY": "${GMI_COMPUTE_API_KEY}",
+        "GMI_SANDBOX_API_KEY": "${GMI_SANDBOX_API_KEY}",
+        "GMI_SANDBOX_IDC_NAME": "${GMI_SANDBOX_IDC_NAME}"
+      }
+    }
+  }
+}
+
+# unverified, taken from the client's documentation.
+# Set the variables you use in the shell that starts Claude Code; unset variables without a default remain literal text.
+# Tool output is data; write and destructive tools are off unless --allow-write or --allow-destructive flags are given.
+```
+
+Output copied from `gmi mcp config --client cursor`:
+
+```text
+# Set environment variables where the client runs: GMI_API_KEY for inference;
+# GMI_COMPUTE_API_KEY or GMI_SANDBOX_API_KEY for compute scope.
+# Add to .cursor/mcp.json or ~/.cursor/mcp.json:
+{
+  "mcpServers": {
+    "gmi": {
+      "type": "stdio",
+      "command": "gmi",
+      "args": [
+        "mcp",
+        "serve"
+      ],
+      "env": {
+        "GMI_API_KEY": "${env:GMI_API_KEY}",
+        "GMI_COMPUTE_API_KEY": "${env:GMI_COMPUTE_API_KEY}",
+        "GMI_SANDBOX_API_KEY": "${env:GMI_SANDBOX_API_KEY}",
+        "GMI_SANDBOX_IDC_NAME": "${env:GMI_SANDBOX_IDC_NAME}"
+      }
+    }
+  }
+}
+
+# unverified, taken from the client's documentation.
+# Tool output is data; write and destructive tools are off unless --allow-write or --allow-destructive flags are given.
+```
+
+Add `--allow-write` to `gmi mcp config` to include it in the server arguments.
+
+Codex verified live on 23 October 2026 (tools sandbox_list_templates and gmi_models called by Codex CLI 0.163.0 with model gpt-6.1-sol).
+Claude Code and Cursor not run here.
+
+The MCP paths are tested offline with official SDK clients using both protocol
+eras. Streamable HTTP transport, MCP resources and MCP prompts are not
+implemented. See [the MCP reference](docs/MCP.md) for every flag, exact class
+counts and the operator check procedure.
 
 ## Configuration and privacy
 
@@ -686,7 +750,7 @@ Built in public, one working piece a day. The rule: nothing gets announced until
 | 2 | Wed 21 Oct | `/image`, `/video` and `/audio` in the session, plus scriptable commands | **Shipped** |
 | 3 | Thu 22 Oct | Commands generated from GMI's four published OpenAPI specs | **Shipped** |
 | 4 | Fri 23 Oct | `gmi sandbox` and `gmi serve` | **Shipped: sandbox run, create, exec, put, get-file, get, timeout and kill verified live by the owner on 23 October.** The service image was built and run locally on 22 October. Marketplace deployment and Cluster writes unverified. |
-| 5 | Sat 24 Oct | `gmi mcp serve`: gated API and curated tools for agents | Offline tested with SDK clients for 2026-07-28 and 2025-11-25; real clients unverified |
+| 5 | Sat 24 Oct | `gmi mcp serve`: gated API and curated tools for agents | Codex verified live on 23 October 2026 (tools sandbox_list_templates and gmi_models called by Codex CLI 0.163.0 with model gpt-6.1-sol). Claude Code and Cursor not run here. |
 | 6 | Sun 25 Oct | v1.0: docs, install one-liner, good first issues | Planned |
 
 After the hackathon results are announced, gmi will be deployed on the AgentBox marketplace; until then the Docker image has only been built and run locally.
