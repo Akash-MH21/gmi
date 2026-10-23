@@ -112,7 +112,7 @@ be finished the day before.
 ## MCP facts (offline verified 2026-10-23)
 
 - `gmi mcp serve` uses the official optional `mcp==2.3.0` SDK over stdio.
-  Install with `pip install "gmi[mcp]"`. Both project and SDK require Python 3.10+.
+  Install with `pip install "gmi[mcp] @ git+https://github.com/zkasuran/gmi"`. Both project and SDK require Python 3.10+.
   The SDK v2 low-level server owns the protocol. Types live in `mcp_types`.
   Official SDK client subprocess tests cover 2026-07-28 metadata requests and
   the older 2025-11-25 initialize handshake. Real agent clients are unverified.

@@ -568,7 +568,9 @@ Let an agent use GMI Cloud through MCP tools over local stdio. Install the optio
 SDK extra, preview the tools then configure your agent client:
 
 ```sh
-pip install 'gmi[mcp]'
+pip install "gmi[mcp] @ git+https://github.com/zkasuran/gmi"
+pipx install "gmi[mcp] @ git+https://github.com/zkasuran/gmi"
+uv tool install "gmi[mcp] @ git+https://github.com/zkasuran/gmi"
 gmi mcp tools
 gmi mcp tools --allow-write --json
 gmi mcp config --client codex

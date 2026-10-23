@@ -6,14 +6,14 @@ low-level server in the official Python SDK `mcp==2.3.0`. The SDK handles both
 The project and the SDK both require Python 3.10 or newer.
 
 ```sh
-pip install 'gmi[mcp]'
+pip install "gmi[mcp] @ git+https://github.com/zkasuran/gmi"
 gmi mcp tools
 gmi mcp serve
 ```
 
 The extra is optional. Core installs can list tools and print configuration
 without the SDK. If the SDK is missing, `gmi mcp serve` writes
-`MCP SDK missing; install with: pip install "gmi[mcp]"` to stderr and exits 2.
+`MCP SDK missing; install with: pip install "gmi[mcp] @ git+https://github.com/zkasuran/gmi"` to stderr and exits 2.
 Only protocol messages go to stdout while serving.
 
 ## Flags

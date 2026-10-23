@@ -43,7 +43,7 @@ def serve(**options):
     try:
         from mcp.server.lowlevel import Server
     except ImportError:
-        click.echo('MCP SDK missing; install with: pip install "gmi[mcp]"', err=True)
+        click.echo('MCP SDK missing; install with: pip install "gmi[mcp] @ git+https://github.com/zkasuran/gmi"', err=True)
         raise click.exceptions.Exit(2) from None
     import anyio
     anyio.run(lambda: run_server(**options))

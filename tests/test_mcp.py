@@ -231,7 +231,7 @@ def test_missing_sdk_hint_and_tools_do_not_import_sdk(monkeypatch):
     result = runner.invoke(main, ['mcp', 'serve'])
     assert result.exit_code == 2
     assert result.stdout == ''
-    assert result.stderr.strip() == 'MCP SDK missing; install with: pip install "gmi[mcp]"'
+    assert result.stderr.strip() == 'MCP SDK missing; install with: pip install "gmi[mcp] @ git+https://github.com/zkasuran/gmi"'
     assert len(result.stderr.splitlines()) == 1
     assert runner.invoke(main, ['mcp', 'tools', '--json']).exit_code == 0
 
