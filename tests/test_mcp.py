@@ -407,7 +407,7 @@ def test_curated_inference_key_models_search_and_chat_usage(monkeypatch):
     result = mcp.execute_curated('gmi_models', {'search': 'a/', 'limit': 1}, 60)
     assert result == {'models': [{'id': 'a/first'}], 'total': 2}
     result = mcp.execute_curated('gmi_chat', {'message': 'hello', 'max_tokens': 16}, 60)
-    assert result == {'reply': 'reply', 'usage': {'total_tokens': '[redacted]'}}
+    assert result == {'reply': 'reply', 'usage': {'total_tokens': 16}}
     assert len(requests) == 2
 
 

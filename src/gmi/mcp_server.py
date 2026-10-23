@@ -251,12 +251,19 @@ def test_base(default):
     return os.environ.get('GMI_MCP_TEST_BASE', default).rstrip('/') if os.environ.get('GMI_MCP_TEST_MODE') == '1' else default
 
 
+def is_credential_field(key, value):
+    name = key.lower().replace('-', '_')
+    return isinstance(value, str) and (name == 'key' or name.endswith((
+        'token', 'secret', 'password', 'passwd', 'api_key', 'apikey',
+        'authorization', 'credential', 'credentials', 'private_key')))
+
+
 def sensitive_values(value):
     """Remember returned credentials so echoed copies are also removed."""
     found = set()
     if isinstance(value, dict):
         for key, item in value.items():
-            if re.search(r'token|secret|password|api_key', key, re.I) and isinstance(item, str):
+            if is_credential_field(key, item):
                 found.add(item)
             found.update(sensitive_values(item))
     elif isinstance(value, list):
@@ -267,7 +274,7 @@ def sensitive_values(value):
 
 def redact(value, secrets=()):
     if isinstance(value, dict):
-        return {key: '[redacted]' if re.search(r'token|secret|password|api_key', key, re.I) else redact(item, secrets)
+        return {key: '[redacted]' if is_credential_field(key, item) else redact(item, secrets)
                 for key, item in value.items()}
     if isinstance(value, list):
         return [redact(item, secrets) for item in value]
