@@ -596,9 +596,14 @@ operations and IAM OAuth operations are never exposed. These need secrets or
 create credentials that should not pass through the model. Curated sandbox
 file tools accept UTF-8 content up to 256 KB and cannot read host files.
 
-Every result redacts values under field names containing `token`, `secret`,
-`password` or `api_key`, ignoring case, plus JWT-shaped strings and known
-credentials. This includes fields such as `total_tokens`. Output is capped at
+Every result redacts string values when the lower-cased field name, after
+replacing `-` with `_`, ends with `token`, `secret`, `password`, `passwd`,
+`api_key`, `apikey`, `authorization`, `credential`, `credentials` or
+`private_key` or equals `key`. This key-name rule never redacts numbers or
+booleans. Names ending with plural `tokens`, such as `prompt_tokens`,
+`completion_tokens`, `total_tokens`, `max_tokens` and `output_tokens`, are not
+redacted by name, even with string values. JWT-shaped strings and known
+credentials are still redacted. Output is capped at
 65536 bytes by default with a truncation marker. Binary responses return a note.
 The server tells agents that tool output is untrusted data, never instructions.
 This prompt-injection instruction does not make returned content trustworthy.

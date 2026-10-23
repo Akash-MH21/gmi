@@ -142,6 +142,43 @@ def test_http_errors_preserve_service_message_and_scope_hint(monkeypatch, status
         assert 'GMI_COMPUTE_API_KEY' in value['hint'] and 'compute scope' in value['hint']
 
 
+@pytest.mark.parametrize('name,redacted', [
+    ('token', True), ('secret', True), ('password', True), ('passwd', True),
+    ('api_key', True), ('apikey', True), ('authorization', True),
+    ('credential', True), ('credentials', True), ('private_key', True), ('key', True),
+    ('sandbox_access_token', True), ('traffic_access_token', True),
+    ('access_token', True), ('refresh_token', True), ('id_token', True),
+    ('clientSecret', True), ('client_passwd', True), ('proxy_authorization', True),
+    ('service_credential', True), ('service_credentials', True), ('ssh_private_key', True),
+    ('prompt_tokens', False), ('completion_tokens', False), ('total_tokens', False),
+    ('max_tokens', False), ('output_tokens', False), ('tokens', False),
+    ('token_count', False), ('secret_label', False), ('password_hint', False),
+    ('api_key_count', False), ('key_name', False), ('monkey', False),
+])
+def test_redaction_credential_key_rule(name, redacted):
+    # Use the same harmless string in each case to distinguish names from values.
+    for key in (name, name.upper(), name.upper().replace('_', '-')):
+        for value in ('sample-value', 16, 1.5, True, False, None, {'count': 3}, [4]):
+            expected = '[redacted]' if redacted and isinstance(value, str) else value
+            payload = {key: value, 'nested': [{key: value}]}
+            cleaned = {key: expected, 'nested': [{key: expected}]}
+            assert mcp.redact(payload) == cleaned
+            assert mcp.sensitive_values(payload) == ({value} if expected == '[redacted]' else set())
+            result = mcp.hygienic_result(payload)
+            assert result['structuredContent'] == cleaned
+            assert json.loads(result['content'][0]['text']) == cleaned
+            embedded = mcp.hygienic_result({'json_text': json.dumps(payload)})
+            assert json.loads(embedded['structuredContent']['json_text']) == cleaned
+
+
+def test_redaction_recurses_through_credential_named_containers():
+    payload = {'access_token': [{'password': 'sample-value', 'total_tokens': 16}],
+               'secret': {'api_key': 'other-value', 'max_tokens': True}}
+    expected = {'access_token': [{'password': '[redacted]', 'total_tokens': 16}],
+                'secret': {'api_key': '[redacted]', 'max_tokens': True}}
+    assert mcp.hygienic_result(payload)['structuredContent'] == expected
+
+
 def test_redaction_nested_keys_jwt_and_known_credentials():
     jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.c2lnbmF0dXJl'
     payload = {'sandbox_access_token': 'fake-access', 'nested': [{'API_KEY': 'fake-key', 'clientSecret': 'secret',
@@ -216,6 +253,19 @@ def local_cloud():
     class Handler(BaseHTTPRequestHandler):
         def log_message(self, *args):
             pass
+        def do_POST(self):
+            calls.append((self.path, dict(self.headers)))
+            body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+            assert self.path == '/chat/completions'
+            assert body['max_completion_tokens'] == 16
+            payload = {'choices': [{'message': {'content': 'reply'}}],
+                       'usage': {'prompt_tokens': 5, 'completion_tokens': 3, 'total_tokens': 8}}
+            response = json.dumps(payload).encode()
+            self.send_response(200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(response)))
+            self.end_headers()
+            self.wfile.write(response)
         def do_GET(self):
             calls.append((self.path, dict(self.headers)))
             payload = {'id': 'box', 'state': 'running', 'sandbox_access_token': 'fake-data-secret',
@@ -254,6 +304,7 @@ def test_official_client_stdio_protocol_and_stdout_hygiene(local_cloud, tmp_path
     params = StdioServerParameters(command=sys.executable,
         args=['-c', 'from gmi.cli import main; main()', 'mcp', 'serve'],
         env={'HOME': str(tmp_path), 'GMI_COMPUTE_API_KEY': 'fake-protocol-key',
+             'GMI_API_KEY': 'fake-protocol-inference',
              'GMI_MCP_TEST_MODE': '1', 'GMI_MCP_TEST_BASE': base})
     stderr_path = tmp_path / 'server.stderr'
     async def exercise():
@@ -274,6 +325,12 @@ def test_official_client_stdio_protocol_and_stdout_hygiene(local_cloud, tmp_path
                 assert result.structured_content['id'] == 'box'
                 assert result.structured_content['sandbox_access_token'] == '[redacted]'
                 assert result.structured_content['message'] == '[redacted]'
+                chat = await client.call_tool('gmi_chat', {'message': 'hello', 'max_tokens': 16})
+                assert not chat.is_error
+                expected = {'reply': 'reply', 'usage': {
+                    'prompt_tokens': 5, 'completion_tokens': 3, 'total_tokens': 8}}
+                assert chat.structured_content == expected
+                assert json.loads(chat.content[0].text) == expected
                 with pytest.raises(MCPError, match='--allow-write') as gated:
                     await client.call_tool('sandbox_create_sandbox', {'body': {'template_id': 't'}})
                 assert gated.value.code == -32602
@@ -290,7 +347,7 @@ def test_official_client_stdio_protocol_and_stdout_hygiene(local_cloud, tmp_path
                 assert 'GMI_COMPUTE_API_KEY' in rejected.content[0].text
                 assert 'fake-data-secret' not in rejected.content[0].text
     asyncio.run(exercise())
-    assert len(calls) == 2
+    assert len(calls) == 3
     assert calls[0][0] == '/sandboxes/a%2Fb'
     assert calls[0][1]['Authorization'] == 'Bearer fake-protocol-key'
     assert calls[0][1]['User-Agent'] == 'gmi-mcp/' + mcp.__version__
@@ -301,6 +358,7 @@ def test_official_client_stdio_protocol_and_stdout_hygiene(local_cloud, tmp_path
         assert ('result' in parsed) or ('error' in parsed) or ('method' in parsed)
     all_output = '\n'.join(stdout_lines) + stderr_path.read_text()
     assert 'fake-protocol-key' not in all_output and 'fake-data-secret' not in all_output
+    assert 'fake-protocol-inference' not in all_output
     assert 'eyJhbGciOiJIUzI1NiJ9' not in all_output
 
 

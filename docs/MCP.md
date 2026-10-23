@@ -90,12 +90,16 @@ argument: each applicable call receives a fresh UUID. GET tools advertise
 read-only annotations; GET, PUT and DELETE advertise idempotence. DELETE tools
 advertise destructive behavior. All tools advertise access to external systems.
 
-Every result, including errors, redacts values under keys containing `token`,
-`secret`, `password` or `api_key`, ignoring case. JWT-shaped strings starting
+Every result, including errors, redacts string values when the lower-cased key
+name, after replacing `-` with `_`, ends with `token`, `secret`, `password`,
+`passwd`, `api_key`, `apikey`, `authorization`, `credential`, `credentials` or
+`private_key` or equals `key`. This key-name rule never redacts numbers or
+booleans. Names ending with plural `tokens`, such as `prompt_tokens`,
+`completion_tokens`, `total_tokens`, `max_tokens` and `output_tokens`, are not
+redacted by name, even with string values. JWT-shaped strings starting
 with `eyJ` and known credentials are also replaced with `[redacted]`. Returned
 secret values are removed from echoed fields too. The same cleaning applies to
-text and structured content. This also redacts usage fields such as
-`total_tokens`. Large results are truncated after redaction; binary API
+text and structured content. Large results are truncated after redaction; binary API
 responses return a note instead of bytes.
 
 Tool output is untrusted data. The server instructions explicitly tell the
