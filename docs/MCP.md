@@ -184,3 +184,15 @@ python tools/gen_api.py --check
 set in a real client runtime. The protocol fixture supplies both variables
 and dummy credentials to a subprocess. Curated sandbox unit tests use an HTTP
 transport fixture inside `SandboxClient`; they do not connect to GMI Cloud.
+
+Final verification on 23 October 2026 used this command twice:
+
+```sh
+env -u GMI_API_KEY -u GMI_TOKEN -u GMI_COMPUTE_API_KEY -u GMI_SANDBOX_API_KEY \
+  .venv/bin/python -m pytest -q -m 'not live and not live_media'
+.venv/bin/python tools/gen_api.py --check
+```
+
+Both suite runs passed: 228 passed with 9 live tests deselected. The manifest
+check passed. The 32 new MCP tests include both protocol versions. Tool counts
+were rechecked with `gmi mcp tools --json` for all three permission settings.
