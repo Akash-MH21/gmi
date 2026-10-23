@@ -120,7 +120,7 @@ def test_recursive_references_and_parameter_overrides(tmp_path, monkeypatch):
     assert op["query_parameters"] == [{"name": "filter", "in": "query", "type": "string", "required": False}]
     assert op["header_parameters"][0]["type"] == "integer"
     assert op["cookie_parameters"][0]["required"] is True
-    assert op["request_body"] == {"content_type": "application/json", "required": True, "properties": [{"name": "node", "type": "object", "required": True}]}
+    assert op["request_body"] == {"content_type": "application/json", "required": True, "properties": [{"name": "node", "type": "object", "required": True}], "schema": {"type": "object", "required": ["node"], "properties": {"node": {"type": "object", "properties": {"child": {}}}}}}
     assert op["returns_binary"] is True
     resolved = generator.deref({"$ref": "#/components/schemas/Node"}, doc)
     assert resolved == {"type": "object", "properties": {"child": {}}}

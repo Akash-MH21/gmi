@@ -67,7 +67,7 @@ def body_info(op, doc):
         item = {"name": name, "type": schema_type(value), "required": name in (schema.get("required") or [])}
         if "enum" in value: item["enum"] = value["enum"]
         props.append(item)
-    return {"content_type": ctype, "required": bool(body.get("required")), "properties": props}
+    return {"content_type": ctype, "required": bool(body.get("required")), "properties": props, "schema": schema}
 
 def generate():
     operations = []

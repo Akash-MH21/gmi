@@ -171,7 +171,8 @@ def _body(data, sets, spec):
     if missing: raise click.ClickException("Missing required body fields: " + ", ".join(missing))
     return value
 
-def _request(o, path_values, query, headers, data, sets, token, access_token, host, output, as_json, yes, dry_run):
+def build_request(o, path_values, query, headers, token=None, access_token=None, host=None, allow_missing=False):
+    """Build the shared API URL and auth headers without performing I/O."""
     path = o["path"]
     for p, v in zip(o["path_parameters"], path_values): path = path.replace("{" + p["name"] + "}", quote(v, safe=""))
     base = host.rstrip("/") if host else o["server"].rstrip("/")
@@ -180,7 +181,7 @@ def _request(o, path_values, query, headers, data, sets, token, access_token, ho
     full = url + (("?" + urlencode(query, doseq=True)) if query else "")
     scheme = o["security_scheme"]; req_headers = {k:v for k,v in headers.items() if v is not None}
     if scheme in ("bearerAuth", "bearerAPIKey"):
-        key, _, _ = _auth_for(o, token, allow_missing=dry_run)
+        key, _, _ = _auth_for(o, token, allow_missing=allow_missing)
         if key: req_headers["Authorization"] = "Bearer " + key
     elif scheme == "bearerEmailVerificationToken":
         if not token: raise click.ClickException("This operation requires --token")
@@ -189,6 +190,10 @@ def _request(o, path_values, query, headers, data, sets, token, access_token, ho
         if not host: raise click.ClickException("This operation requires --host https://{sandbox_key}.{domain}")
         if not access_token: raise click.ClickException("This operation requires --access-token or GMI_SANDBOX_TOKEN")
         req_headers["X-Access-Token"] = access_token
+    return full, req_headers
+
+def _request(o, path_values, query, headers, data, sets, token, access_token, host, output, as_json, yes, dry_run):
+    full, req_headers = build_request(o, path_values, query, headers, token, access_token, host, dry_run)
     body = _body(data, sets, o.get("request_body")) if o.get("request_body") else None
     shown = {k:(_masked_header(v) if k.lower() in ("authorization","x-access-token") else v) for k,v in req_headers.items()}
     if dry_run:

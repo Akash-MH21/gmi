@@ -59,7 +59,66 @@
             "type": "array"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "count": {
+              "minimum": 1,
+              "type": "integer"
+            },
+            "enableZabbixAgent": {
+              "default": true,
+              "description": "Whether to enable Zabbix agent on the baremetal node",
+              "type": "boolean"
+            },
+            "idc": {
+              "maxLength": 50,
+              "pattern": "^[a-zA-Z0-9._-]+$",
+              "type": "string"
+            },
+            "imageId": {
+              "description": "The ID of the image to use for creating the baremetal instance",
+              "format": "uuid",
+              "type": "string"
+            },
+            "internalIp": {
+              "description": "Manually allocate internal IP address(IPv4 only). If not provided, internal IP will be allocated automatically. It only supports single baremetal creation.",
+              "maxLength": 15,
+              "minLength": 7,
+              "type": "string"
+            },
+            "name": {
+              "maxLength": 255,
+              "pattern": "^([A-Za-z0-9][A-Za-z0-9_\\-. ]*)?[A-Za-z0-9]$",
+              "type": "string"
+            },
+            "product": {
+              "maxLength": 256,
+              "pattern": "^[a-zA-Z0-9._-]+$",
+              "type": "string"
+            },
+            "sshKey": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "sshKeyIdList": {
+              "description": "The list of SSH key IDs to use for creating the baremetal instance",
+              "items": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "idc",
+            "product",
+            "name",
+            "count",
+            "imageId"
+          ],
+          "type": "object"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -123,7 +182,24 @@
             "type": "string"
           }
         ],
-        "required": false
+        "required": false,
+        "schema": {
+          "properties": {
+            "type": {
+              "enum": [
+                "start",
+                "stop",
+                "powercycle",
+                "reboot"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "type"
+          ],
+          "type": "object"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -229,7 +305,18 @@
             "type": "string"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -274,7 +361,151 @@
       "request_body": {
         "content_type": "application/json",
         "properties": [],
-        "required": true
+        "required": true,
+        "schema": {
+          "allOf": [
+            {
+              "properties": {
+                "count": {
+                  "minimum": 1,
+                  "type": "integer"
+                }
+              },
+              "required": [
+                "count"
+              ],
+              "type": "object"
+            },
+            {
+              "allOf": [
+                {
+                  "properties": {
+                    "idc": {
+                      "maxLength": 50,
+                      "pattern": "^[a-zA-Z0-9._-]+$",
+                      "type": "string"
+                    },
+                    "product": {
+                      "maxLength": 256,
+                      "pattern": "^[a-zA-Z0-9._-]+$",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "product",
+                    "idc"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "properties": {
+                    "args": {
+                      "default": [],
+                      "description": "Optional container command arguments",
+                      "items": {
+                        "type": "string"
+                      },
+                      "type": "array",
+                      "x-go-type-skip-optional-pointer": true
+                    },
+                    "command": {
+                      "default": "",
+                      "description": "Optional container start command",
+                      "type": "string",
+                      "x-go-type-skip-optional-pointer": true
+                    },
+                    "envs": {
+                      "default": [],
+                      "example": [
+                        {
+                          "name": "access_token",
+                          "value": "kalsk113=="
+                        }
+                      ],
+                      "items": {
+                        "properties": {
+                          "name": {
+                            "maxLength": 4096,
+                            "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                            "type": "string"
+                          },
+                          "value": {
+                            "default": "",
+                            "maxLength": 1048576,
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "name",
+                          "value"
+                        ]
+                      },
+                      "minLength": 0,
+                      "type": "array"
+                    },
+                    "name": {
+                      "example": "LLM training",
+                      "maxLength": 255,
+                      "pattern": "^([A-Za-z0-9][A-Za-z0-9_\\-. ]*)?[A-Za-z0-9]$",
+                      "type": "string"
+                    },
+                    "ports": {
+                      "default": [],
+                      "items": {
+                        "properties": {
+                          "containerPort": {
+                            "maximum": 65534,
+                            "minimum": 0,
+                            "type": "integer"
+                          },
+                          "port": {
+                            "maximum": 65534,
+                            "minimum": 0,
+                            "type": "integer",
+                            "x-go-type-skip-optional-pointer": true
+                          },
+                          "protocol": {
+                            "enum": [
+                              "TCP",
+                              "UDP"
+                            ],
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "containerPort",
+                          "protocol"
+                        ]
+                      },
+                      "maxLength": 5,
+                      "minLength": 0,
+                      "type": "array",
+                      "x-go-type-skip-optional-pointer": true
+                    },
+                    "sshKeyIdList": {
+                      "description": "The list of SSH key IDs to use in the container",
+                      "items": {
+                        "format": "uuid",
+                        "type": "string"
+                      },
+                      "type": "array"
+                    },
+                    "templateId": {
+                      "description": "template id",
+                      "format": "uuid",
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "templateId"
+                  ],
+                  "type": "object"
+                }
+              ]
+            }
+          ]
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -475,7 +706,112 @@
             "type": "string"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "args": {
+              "default": [],
+              "description": "Optional container command arguments",
+              "items": {
+                "type": "string"
+              },
+              "type": "array",
+              "x-go-type-skip-optional-pointer": true
+            },
+            "command": {
+              "default": "",
+              "description": "Optional container start command",
+              "type": "string",
+              "x-go-type-skip-optional-pointer": true
+            },
+            "envs": {
+              "default": [],
+              "example": [
+                {
+                  "name": "access_token",
+                  "value": "kalsk113=="
+                }
+              ],
+              "items": {
+                "properties": {
+                  "name": {
+                    "maxLength": 4096,
+                    "pattern": "^[a-zA-Z_][a-zA-Z0-9_]*$",
+                    "type": "string"
+                  },
+                  "value": {
+                    "default": "",
+                    "maxLength": 1048576,
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "name",
+                  "value"
+                ]
+              },
+              "minLength": 0,
+              "type": "array"
+            },
+            "name": {
+              "example": "LLM training",
+              "maxLength": 255,
+              "pattern": "^([A-Za-z0-9][A-Za-z0-9_\\-. ]*)?[A-Za-z0-9]$",
+              "type": "string"
+            },
+            "ports": {
+              "default": [],
+              "items": {
+                "properties": {
+                  "containerPort": {
+                    "maximum": 65534,
+                    "minimum": 0,
+                    "type": "integer"
+                  },
+                  "port": {
+                    "maximum": 65534,
+                    "minimum": 0,
+                    "type": "integer",
+                    "x-go-type-skip-optional-pointer": true
+                  },
+                  "protocol": {
+                    "enum": [
+                      "TCP",
+                      "UDP"
+                    ],
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "containerPort",
+                  "protocol"
+                ]
+              },
+              "maxLength": 5,
+              "minLength": 0,
+              "type": "array",
+              "x-go-type-skip-optional-pointer": true
+            },
+            "sshKeyIdList": {
+              "description": "The list of SSH key IDs to use in the container",
+              "items": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "type": "array"
+            },
+            "templateId": {
+              "description": "template id",
+              "format": "uuid",
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "templateId"
+          ],
+          "type": "object"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -517,7 +853,39 @@
             "type": "string"
           }
         ],
-        "required": false
+        "required": false,
+        "schema": {
+          "properties": {
+            "count": {
+              "default": 1,
+              "minimum": 1,
+              "type": "integer"
+            },
+            "idc": {
+              "maxLength": 50,
+              "pattern": "^[a-zA-Z0-9._-]+$",
+              "type": "string"
+            },
+            "name": {
+              "description": "Name of the elastic IP",
+              "maxLength": 255,
+              "pattern": "^([A-Za-z0-9][A-Za-z0-9_\\-. ]*)?[A-Za-z0-9]$",
+              "type": "string"
+            },
+            "product": {
+              "maxLength": 256,
+              "pattern": "^[a-zA-Z0-9._-]+$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "idc",
+            "count",
+            "name",
+            "product"
+          ],
+          "type": "object"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -560,7 +928,26 @@
             "type": "string"
           }
         ],
-        "required": false
+        "required": false,
+        "schema": {
+          "properties": {
+            "instanceID": {
+              "description": "set instanceID and instanceType to associate the elastic IP to the instance, set to null to disassociate the elastic IP from the instance",
+              "format": "uuid",
+              "nullable": true,
+              "type": "string"
+            },
+            "instanceType": {
+              "enum": [
+                "baremetal",
+                "container"
+              ],
+              "nullable": true,
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -716,7 +1103,30 @@
             "type": "string"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "instanceType": {
+              "default": "baremetal",
+              "enum": [
+                "baremetal",
+                "container"
+              ],
+              "type": "string"
+            },
+            "instances": {
+              "items": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "instances"
+          ],
+          "type": "object"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -737,7 +1147,121 @@
       "request_body": {
         "content_type": "application/json",
         "properties": [],
-        "required": true
+        "required": true,
+        "schema": {
+          "allOf": [
+            {
+              "properties": {
+                "description": {
+                  "maxLength": 255,
+                  "type": "string"
+                },
+                "inboundRules": {
+                  "items": {
+                    "oneOf": [
+                      {
+                        "properties": {
+                          "description": {
+                            "maxLength": 255,
+                            "type": "string"
+                          },
+                          "portRange": {
+                            "properties": {
+                              "max": {
+                                "maximum": 65535,
+                                "minimum": 1,
+                                "type": "integer"
+                              },
+                              "min": {
+                                "maximum": 65535,
+                                "minimum": 1,
+                                "type": "integer"
+                              }
+                            },
+                            "required": [
+                              "min",
+                              "max"
+                            ],
+                            "type": "object"
+                          },
+                          "protocol": {
+                            "enum": [
+                              "tcp",
+                              "udp"
+                            ],
+                            "type": "string"
+                          },
+                          "remoteIpPrefix": {
+                            "description": "CIDR notation",
+                            "example": "237.84.2.178/24",
+                            "pattern": "^[0-9]{1,3}(\\.[0-9]{1,3}){3}\\/[0-9]{1,2}$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "protocol",
+                          "portRange",
+                          "remoteIpPrefix"
+                        ],
+                        "type": "object"
+                      },
+                      {
+                        "additionalProperties": false,
+                        "properties": {
+                          "description": {
+                            "maxLength": 255,
+                            "type": "string"
+                          },
+                          "protocol": {
+                            "enum": [
+                              "icmp",
+                              "any"
+                            ],
+                            "type": "string"
+                          },
+                          "remoteIpPrefix": {
+                            "description": "CIDR notation",
+                            "example": "237.84.2.178/24",
+                            "pattern": "^[0-9]{1,3}(\\.[0-9]{1,3}){3}\\/[0-9]{1,2}$",
+                            "type": "string"
+                          }
+                        },
+                        "required": [
+                          "protocol",
+                          "remoteIpPrefix"
+                        ],
+                        "type": "object"
+                      }
+                    ]
+                  },
+                  "type": "array"
+                },
+                "name": {
+                  "maxLength": 255,
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "inboundRules"
+              ],
+              "type": "object"
+            },
+            {
+              "properties": {
+                "idc": {
+                  "maxLength": 50,
+                  "pattern": "^[a-zA-Z0-9._-]+$",
+                  "type": "string"
+                }
+              },
+              "required": [
+                "idc"
+              ],
+              "type": "object"
+            }
+          ]
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -804,7 +1328,30 @@
             "type": "string"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "instanceType": {
+              "default": "baremetal",
+              "enum": [
+                "baremetal",
+                "container"
+              ],
+              "type": "string"
+            },
+            "instances": {
+              "items": {
+                "format": "uuid",
+                "type": "string"
+              },
+              "type": "array"
+            }
+          },
+          "required": [
+            "instances"
+          ],
+          "type": "object"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -896,7 +1443,104 @@
             "type": "string"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "description": {
+              "maxLength": 255,
+              "type": "string"
+            },
+            "inboundRules": {
+              "items": {
+                "oneOf": [
+                  {
+                    "properties": {
+                      "description": {
+                        "maxLength": 255,
+                        "type": "string"
+                      },
+                      "portRange": {
+                        "properties": {
+                          "max": {
+                            "maximum": 65535,
+                            "minimum": 1,
+                            "type": "integer"
+                          },
+                          "min": {
+                            "maximum": 65535,
+                            "minimum": 1,
+                            "type": "integer"
+                          }
+                        },
+                        "required": [
+                          "min",
+                          "max"
+                        ],
+                        "type": "object"
+                      },
+                      "protocol": {
+                        "enum": [
+                          "tcp",
+                          "udp"
+                        ],
+                        "type": "string"
+                      },
+                      "remoteIpPrefix": {
+                        "description": "CIDR notation",
+                        "example": "237.84.2.178/24",
+                        "pattern": "^[0-9]{1,3}(\\.[0-9]{1,3}){3}\\/[0-9]{1,2}$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "protocol",
+                      "portRange",
+                      "remoteIpPrefix"
+                    ],
+                    "type": "object"
+                  },
+                  {
+                    "additionalProperties": false,
+                    "properties": {
+                      "description": {
+                        "maxLength": 255,
+                        "type": "string"
+                      },
+                      "protocol": {
+                        "enum": [
+                          "icmp",
+                          "any"
+                        ],
+                        "type": "string"
+                      },
+                      "remoteIpPrefix": {
+                        "description": "CIDR notation",
+                        "example": "237.84.2.178/24",
+                        "pattern": "^[0-9]{1,3}(\\.[0-9]{1,3}){3}\\/[0-9]{1,2}$",
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "protocol",
+                      "remoteIpPrefix"
+                    ],
+                    "type": "object"
+                  }
+                ]
+              },
+              "type": "array"
+            },
+            "name": {
+              "maxLength": 255,
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "inboundRules"
+          ],
+          "type": "object"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -1002,7 +1646,64 @@
             "type": "string"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "credential": {
+              "default": {
+                "secret": "",
+                "username": ""
+              },
+              "properties": {
+                "secret": {
+                  "default": "",
+                  "format": "password",
+                  "maxLength": 4096,
+                  "minLength": 0,
+                  "type": "string"
+                },
+                "username": {
+                  "default": "",
+                  "maxLength": 4096,
+                  "minLength": 0,
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "description": {
+              "default": "",
+              "maxLength": 4096,
+              "minLength": 0,
+              "type": "string"
+            },
+            "name": {
+              "maxLength": 255,
+              "pattern": "^([A-Za-z0-9][A-Za-z0-9_\\-. ]*)?[A-Za-z0-9]$",
+              "type": "string"
+            },
+            "path": {
+              "format": "uri",
+              "maxLength": 253,
+              "pattern": "^\\S+$",
+              "type": "string"
+            },
+            "status": {
+              "default": "published",
+              "enum": [
+                "draft",
+                "published",
+                "unpublished"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "path"
+          ],
+          "type": "object"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -1126,7 +1827,64 @@
             "type": "string"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "credential": {
+              "default": {
+                "secret": "",
+                "username": ""
+              },
+              "properties": {
+                "secret": {
+                  "default": "",
+                  "format": "password",
+                  "maxLength": 4096,
+                  "minLength": 0,
+                  "type": "string"
+                },
+                "username": {
+                  "default": "",
+                  "maxLength": 4096,
+                  "minLength": 0,
+                  "type": "string"
+                }
+              },
+              "type": "object"
+            },
+            "description": {
+              "default": "",
+              "maxLength": 4096,
+              "minLength": 0,
+              "type": "string"
+            },
+            "name": {
+              "maxLength": 255,
+              "pattern": "^([A-Za-z0-9][A-Za-z0-9_\\-. ]*)?[A-Za-z0-9]$",
+              "type": "string"
+            },
+            "path": {
+              "format": "uri",
+              "maxLength": 253,
+              "pattern": "^\\S+$",
+              "type": "string"
+            },
+            "status": {
+              "default": "published",
+              "enum": [
+                "draft",
+                "published",
+                "unpublished"
+              ],
+              "type": "string"
+            }
+          },
+          "required": [
+            "name",
+            "path"
+          ],
+          "type": "object"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -1153,7 +1911,20 @@
             "type": "string"
           }
         ],
-        "required": false
+        "required": false,
+        "schema": {
+          "properties": {
+            "idc": {
+              "maxLength": 50,
+              "pattern": "^[a-zA-Z0-9._-]+$",
+              "type": "string"
+            }
+          },
+          "required": [
+            "idc"
+          ],
+          "type": "object"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -1281,7 +2052,33 @@
             "type": "string"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "email": {
+              "description": "User's email address.\n- Must be a valid email format.\n",
+              "example": "john_doe@example.com",
+              "type": "string",
+              "x-oapi-codegen-extra-tags": {
+                "binding": "required,email"
+              }
+            },
+            "password": {
+              "description": "User's password.",
+              "example": "john_doe_password",
+              "type": "string",
+              "x-oapi-codegen-extra-tags": {
+                "binding": "required"
+              }
+            }
+          },
+          "required": [
+            "email",
+            "password"
+          ],
+          "type": "object",
+          "x-go-name": "createAuthTokenRequest"
+        }
       },
       "returns_binary": false,
       "security_scheme": "none",
@@ -1318,7 +2115,43 @@
             "type": "string"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "accessToken": {
+              "description": "OAuth access token (e.g., Google).",
+              "example": "ya29.a0AfH6SMB...",
+              "type": "string",
+              "x-oapi-codegen-extra-tags": {
+                "binding": "required"
+              }
+            },
+            "provider": {
+              "description": "The authentication provider used for login.\n- \"google\": User logs in with Google OAuth.\n- \"github\": User logs in with Github OAuth.\n- \"hugging_face\": User logs in with Hugging Face OAuth.\n",
+              "enum": [
+                "google",
+                "github",
+                "hugging_face"
+              ],
+              "example": "google",
+              "type": "string",
+              "x-go-type": "iamLibTypes.OAuthProvider",
+              "x-go-type-import": {
+                "name": "iamLibTypes",
+                "path": "us-central1-go.pkg.dev/gmi-cloud-cicd/go-dev/iam-lib-go/pkg/types"
+              },
+              "x-oapi-codegen-extra-tags": {
+                "binding": "required"
+              }
+            }
+          },
+          "required": [
+            "provider",
+            "accessToken"
+          ],
+          "type": "object",
+          "x-go-name": "createOAuthAuthTokenRequest"
+        }
       },
       "returns_binary": false,
       "security_scheme": "none",
@@ -1357,7 +2190,34 @@
             "type": "string"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "authToken": {
+              "description": "A temporary token issued by the create auth token API. This token is used in the create session API to exchange for access and refresh tokens.\n",
+              "example": "eyJhbGciOiJIUzI1NiIsInR...",
+              "type": "string",
+              "x-oapi-codegen-extra-tags": {
+                "binding": "required"
+              }
+            },
+            "otpCode": {
+              "description": "(Optional) A one-time passcode (OTP) provided by the user for native login with 2FA verification.\n- Must be a numeric code.\n- This field is required only if the `is2FARequired` field in the `POST /me/auth-tokens` API response is `true`.\n",
+              "example": 321673,
+              "type": "string",
+              "x-go-type-skip-optional-pointer": true,
+              "x-oapi-codegen-extra-tags": {
+                "binding": "omitempty,numeric"
+              }
+            }
+          },
+          "required": [
+            "type",
+            "authToken"
+          ],
+          "type": "object",
+          "x-go-name": "createSessionRequest"
+        }
       },
       "returns_binary": false,
       "security_scheme": "none",
@@ -1389,7 +2249,33 @@
             "type": "string"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "name": {
+              "description": "Human-readable name for the SSH key.",
+              "example": "My SSH key",
+              "type": "string",
+              "x-oapi-codegen-extra-tags": {
+                "binding": "required"
+              }
+            },
+            "sshKey": {
+              "description": "The full SSH public key supported by OpenSSH (e.g., ssh-rsa, ssh-ed25519, ecdsa-sha2-nistp256).\n",
+              "example": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBn... user@host",
+              "type": "string",
+              "x-oapi-codegen-extra-tags": {
+                "binding": "required"
+              }
+            }
+          },
+          "required": [
+            "sshKey",
+            "name"
+          ],
+          "type": "object",
+          "x-go-name": "createSSHKeyRequest"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -1494,7 +2380,24 @@
             "type": "string"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "refreshToken": {
+              "description": "The token to refresh the session. A refresh token can only be used once.",
+              "example": "eyJhbGciOiJIUzI1NiIsInR...",
+              "type": "string",
+              "x-oapi-codegen-extra-tags": {
+                "binding": "required"
+              }
+            }
+          },
+          "required": [
+            "refreshToken"
+          ],
+          "type": "object",
+          "x-go-name": "refreshSessionRequest"
+        }
       },
       "returns_binary": false,
       "security_scheme": "none",
@@ -1521,7 +2424,24 @@
             "type": "string"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "authToken": {
+              "description": "A temporary token issued by the create auth token API. This token is used in the create session API to exchange for access and refresh tokens.\n",
+              "example": "eyJhbGciOiJIUzI1NiIsInR...",
+              "type": "string",
+              "x-oapi-codegen-extra-tags": {
+                "binding": "required"
+              }
+            }
+          },
+          "required": [
+            "authToken"
+          ],
+          "type": "object",
+          "x-go-name": "resend2FACodeRequest"
+        }
       },
       "returns_binary": false,
       "security_scheme": "none",
@@ -1555,7 +2475,24 @@
             "type": "string"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "name": {
+              "description": "Human-readable name for the SSH key.",
+              "example": "My Updated SSH key",
+              "type": "string",
+              "x-oapi-codegen-extra-tags": {
+                "binding": "required"
+              }
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object",
+          "x-go-name": "updateSSHKeyRequest"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -1597,7 +2534,51 @@
             "type": "string"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "currentPassword": {
+              "description": "The user's current password for update password.\n- This field is only required for authenticated users.\n",
+              "example": "OldPassword123!",
+              "type": "string",
+              "x-go-type-skip-optional-pointer": true,
+              "x-oapi-codegen-extra-tags": {
+                "binding": "omitempty"
+              }
+            },
+            "newPassword": {
+              "description": "The new password.",
+              "example": "MyNewSecurePassword123!",
+              "type": "string",
+              "x-oapi-codegen-extra-tags": {
+                "binding": "required"
+              }
+            },
+            "otpCode": {
+              "description": "A one-time passcode (OTP) for reset user password.\n- Must be a numeric code.\n- This field is only required for password reset users.\n",
+              "example": 321673,
+              "type": "string",
+              "x-go-type-skip-optional-pointer": true,
+              "x-oapi-codegen-extra-tags": {
+                "binding": "omitempty,numeric"
+              }
+            },
+            "passwordResetToken": {
+              "description": "A temporary Bearer token used for password reset authentication which is issued when a user requests a password reset.\n- This field is only required for password reset users.\n",
+              "example": "eyJhbGciOiJIUzI1NiIsInR...",
+              "type": "string",
+              "x-go-type-skip-optional-pointer": true,
+              "x-oapi-codegen-extra-tags": {
+                "binding": "omitempty"
+              }
+            }
+          },
+          "required": [
+            "newPassword"
+          ],
+          "type": "object",
+          "x-go-name": "updatePasswordRequest"
+        }
       },
       "returns_binary": false,
       "security_scheme": "none",
@@ -1629,7 +2610,31 @@
             "type": "string"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "firstName": {
+              "description": "The user's first name.",
+              "example": "john",
+              "type": "string",
+              "x-go-type-skip-optional-pointer": true,
+              "x-oapi-codegen-extra-tags": {
+                "binding": "omitempty"
+              }
+            },
+            "lastName": {
+              "description": "The user's last name.",
+              "example": "doe",
+              "type": "string",
+              "x-go-type-skip-optional-pointer": true,
+              "x-oapi-codegen-extra-tags": {
+                "binding": "omitempty"
+              }
+            }
+          },
+          "type": "object",
+          "x-go-name": "updateProfileRequest"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -1681,7 +2686,41 @@
             "type": "string"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "code": {
+              "description": "The OAuth authorization code received from the OAuth callback.",
+              "example": "abc123def456",
+              "type": "string",
+              "x-oapi-codegen-extra-tags": {
+                "binding": "required"
+              }
+            },
+            "provider": {
+              "description": "The OAuth provider name.\n- \"github\": GitHub OAuth.\n",
+              "enum": [
+                "github"
+              ],
+              "example": "github",
+              "type": "string",
+              "x-go-type": "iamLibTypes.OAuthProvider",
+              "x-go-type-import": {
+                "name": "iamLibTypes",
+                "path": "us-central1-go.pkg.dev/gmi-cloud-cicd/go-dev/iam-lib-go/pkg/types"
+              },
+              "x-oapi-codegen-extra-tags": {
+                "binding": "required"
+              }
+            }
+          },
+          "required": [
+            "provider",
+            "code"
+          ],
+          "type": "object",
+          "x-go-name": "exchangeAuthorizationCodeRequest"
+        }
       },
       "returns_binary": false,
       "security_scheme": "none",
@@ -1759,7 +2798,52 @@
             "type": "integer"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "expiresAt": {
+              "description": "The UNIX timestamp when API key will expire (UTC).\n- Must be a UNIX timestamp in seconds and must be greater than the current time.\n- If not set, the key will not expire.\n",
+              "example": 1738812775,
+              "type": "integer",
+              "x-go-type": "int64",
+              "x-oapi-codegen-extra-tags": {
+                "binding": "omitempty,expirationTime"
+              }
+            },
+            "name": {
+              "description": "The API key name.",
+              "example": "My Service API Key",
+              "type": "string",
+              "x-oapi-codegen-extra-tags": {
+                "binding": "required"
+              }
+            },
+            "scope": {
+              "description": "The API key scope. Default value is `ie_model`.",
+              "enum": [
+                "ie_model",
+                "ce_resource"
+              ],
+              "example": "ie_model",
+              "type": "string",
+              "x-go-type": "ceCommonLibTypes.IasAPIKeyScope",
+              "x-go-type-import": {
+                "name": "ceCommonLibTypes",
+                "path": "us-central1-go.pkg.dev/gmi-cloud-cicd/go-dev/ce-common-lib-go/pkg/types"
+              },
+              "x-go-type-skip-optional-pointer": true,
+              "x-oapi-codegen-extra-tags": {
+                "binding": "omitempty,oneof=ie_model ce_resource",
+                "default": "ie_model"
+              }
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object",
+          "x-go-name": "createApiKeyRequest"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -1912,7 +2996,24 @@
             "type": "string"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "name": {
+              "description": "The organization's name.",
+              "example": "My Organization",
+              "type": "string",
+              "x-oapi-codegen-extra-tags": {
+                "binding": "required"
+              }
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object",
+          "x-go-name": "registerOrganizationRequest"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -1946,7 +3047,57 @@
             "type": "array"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "invitees": {
+              "description": "List of invitees' email and role.",
+              "items": {
+                "properties": {
+                  "email": {
+                    "description": "The email address of the user to invite.",
+                    "example": "user@example.com",
+                    "type": "string",
+                    "x-oapi-codegen-extra-tags": {
+                      "binding": "required,email,emailCheck"
+                    }
+                  },
+                  "role": {
+                    "description": "The organization role assigned to the user.",
+                    "enum": [
+                      "org_user"
+                    ],
+                    "example": "org_user",
+                    "type": "string",
+                    "x-go-type": "ceCommonLibTypes.IasOrganizationRole",
+                    "x-go-type-import": {
+                      "name": "ceCommonLibTypes",
+                      "path": "us-central1-go.pkg.dev/gmi-cloud-cicd/go-dev/ce-common-lib-go/pkg/types"
+                    },
+                    "x-oapi-codegen-extra-tags": {
+                      "binding": "required,oneof=org_user"
+                    }
+                  }
+                },
+                "required": [
+                  "email",
+                  "role"
+                ],
+                "type": "object",
+                "x-go-name": "inviteeInfo"
+              },
+              "type": "array",
+              "x-oapi-codegen-extra-tags": {
+                "binding": "required,gt=0,dive"
+              }
+            }
+          },
+          "required": [
+            "invitees"
+          ],
+          "type": "object",
+          "x-go-name": "sendInvitationsEmailRequest"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -1980,7 +3131,24 @@
             "type": "string"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "newOwnerId": {
+              "description": "The user ID of the new owner, who must be a current member of the organization.",
+              "example": "a0eebc99-9c0b-4ef8-bb6d-6bb9bd380a11",
+              "type": "string",
+              "x-oapi-codegen-extra-tags": {
+                "binding": "required,uuid"
+              }
+            }
+          },
+          "required": [
+            "newOwnerId"
+          ],
+          "type": "object",
+          "x-go-name": "transferOrganizationOwnerRequest"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -2014,7 +3182,24 @@
             "type": "string"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "name": {
+              "description": "The organization's name.",
+              "example": "My Organization",
+              "type": "string",
+              "x-oapi-codegen-extra-tags": {
+                "binding": "required"
+              }
+            }
+          },
+          "required": [
+            "name"
+          ],
+          "type": "object",
+          "x-go-name": "updateOrganizationInfoRequest"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -2065,7 +3250,25 @@
             "type": "string"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "otpCode": {
+              "description": "A one-time passcode (OTP) provided by the user for email verification.\n- Must be a numeric code.\n",
+              "example": 321673,
+              "type": "string",
+              "x-go-type-skip-optional-pointer": true,
+              "x-oapi-codegen-extra-tags": {
+                "binding": "required,numeric"
+              }
+            }
+          },
+          "required": [
+            "otpCode"
+          ],
+          "type": "object",
+          "x-go-name": "emailVerificationRequest"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerEmailVerificationToken",
@@ -2092,7 +3295,24 @@
             "type": "string"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "email": {
+              "description": "User's email address for requesting a password reset.\n- Must be a valid email format.\n",
+              "example": "john_doe@example.com",
+              "type": "string",
+              "x-oapi-codegen-extra-tags": {
+                "binding": "required,email"
+              }
+            }
+          },
+          "required": [
+            "email"
+          ],
+          "type": "object",
+          "x-go-name": "passwordResetRequest"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -2160,7 +3380,17 @@
             "type": "integer"
           }
         ],
-        "required": false
+        "required": false,
+        "schema": {
+          "properties": {
+            "timeout": {
+              "description": "When greater than 0, extends the lifetime of a running sandbox (extend-only, never shortens).",
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -2214,7 +3444,41 @@
             "type": "object"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "env_vars": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "type": "object"
+            },
+            "idc_name": {
+              "description": "Target data center name, e.g. us-central1-c. Optional: when omitted, the organization's configured default data center is used (maintained by the platform administrator); if the organization has no default configured, the request returns 400. Note that Templates are bound to a data center: the effective data center (whether explicit or default) must match the one that owns the Template referenced by `template_id`, otherwise the request is treated as template-not-found.\n",
+              "type": "string"
+            },
+            "metadata": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Customer-defined key/value pairs; the platform does not interpret them. The list endpoint can filter by them.",
+              "type": "object"
+            },
+            "template_id": {
+              "description": "Template identifier or name. A snapshot-as-template `snapshotID` is also valid here.",
+              "type": "string"
+            },
+            "timeout": {
+              "description": "Time-to-live in seconds. When omitted or 0 or less, 300 seconds is used.",
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          "required": [
+            "template_id"
+          ],
+          "type": "object"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -2346,7 +3610,17 @@
             "type": "integer"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "timeout": {
+              "description": "Time-to-live in seconds, measured from the current time. When omitted or 0 or less, 300 seconds is used.",
+              "format": "int64",
+              "type": "integer"
+            }
+          },
+          "type": "object"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -2380,7 +3654,22 @@
             "type": "object"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "metadata": {
+              "additionalProperties": {
+                "type": "string"
+              },
+              "description": "Customer metadata, replaced as a whole.",
+              "type": "object"
+            }
+          },
+          "required": [
+            "metadata"
+          ],
+          "type": "object"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -2468,7 +3757,48 @@
             "type": "object"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "action": {
+              "description": "Execution action. The sealed data plane currently supports exec only.",
+              "enum": [
+                "exec"
+              ],
+              "type": "string"
+            },
+            "parameters": {
+              "additionalProperties": false,
+              "properties": {
+                "command": {
+                  "description": "Shell command to execute.",
+                  "type": "string"
+                },
+                "cwd": {
+                  "description": "Absolute working directory. Defaults to `/home/user`.",
+                  "type": "string"
+                },
+                "envs": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "description": "Environment variables for the command.",
+                  "type": "object"
+                }
+              },
+              "required": [
+                "command"
+              ],
+              "type": "object"
+            }
+          },
+          "required": [
+            "action",
+            "parameters"
+          ],
+          "type": "object"
+        }
       },
       "returns_binary": false,
       "security_scheme": "sandboxAccessToken",
@@ -2576,7 +3906,20 @@
             "type": "string"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "properties": {
+            "file": {
+              "description": "The file content.",
+              "format": "binary",
+              "type": "string"
+            }
+          },
+          "required": [
+            "file"
+          ],
+          "type": "object"
+        }
       },
       "returns_binary": false,
       "security_scheme": "sandboxAccessToken",
@@ -2635,7 +3978,215 @@
             "type": "string"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "additionalProperties": false,
+          "properties": {
+            "build": {
+              "allOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "commands": {
+                      "description": "Shell command strings executed sequentially during the Build.",
+                      "items": {
+                        "maxLength": 8192,
+                        "minLength": 1,
+                        "type": "string"
+                      },
+                      "maxItems": 100,
+                      "type": "array"
+                    },
+                    "envs": {
+                      "additionalProperties": {
+                        "maxLength": 32768,
+                        "type": "string"
+                      },
+                      "description": "Environment variables available only during the Template Build.\nThey are visible to subsequent build commands/steps and are not persisted\ninto the resulting template artifact as sandbox runtime environment\nvariables. Pass runtime env when creating a Sandbox instead. Write-only:\nvalues are never returned on Template or TemplateBuild responses.\nKeys must be unique (JSON object); the server orders them\ndeterministically by key. Key names must match\n`[A-Za-z_][A-Za-z0-9_]*`.\n",
+                      "maxProperties": 256,
+                      "type": "object"
+                    },
+                    "source": {
+                      "description": "Manual Build source. Sandbox sources use the snapshot endpoint.",
+                      "discriminator": {
+                        "mapping": {
+                          "image": "#/components/schemas/ImageSource",
+                          "template": "#/components/schemas/TemplateSource"
+                        },
+                        "propertyName": "type"
+                      },
+                      "oneOf": [
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "image": {
+                              "description": "Debian or Ubuntu container image reference. The server validates\nthe image against the IDC-supported base OS policy.\n",
+                              "minLength": 1,
+                              "type": "string"
+                            },
+                            "type": {
+                              "enum": [
+                                "image"
+                              ],
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "image"
+                          ],
+                          "type": "object"
+                        },
+                        {
+                          "additionalProperties": false,
+                          "properties": {
+                            "build_id": {
+                              "description": "Optional parent Build identifier. When omitted, the parent's\ncurrent successful Build is used.\n",
+                              "type": "string"
+                            },
+                            "template_id": {
+                              "description": "Parent Template identifier in the same IDC.",
+                              "type": "string"
+                            },
+                            "type": {
+                              "enum": [
+                                "template"
+                              ],
+                              "type": "string"
+                            }
+                          },
+                          "required": [
+                            "type",
+                            "template_id"
+                          ],
+                          "type": "object"
+                        }
+                      ]
+                    },
+                    "start_cmd": {
+                      "description": "Launch command persisted with the Build and applied when Sandboxes\ncreated from this Template start.\n",
+                      "maxLength": 8192,
+                      "minLength": 1,
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "source"
+                  ],
+                  "type": "object"
+                }
+              ],
+              "description": "Initial Build definition created and started with the Template\n(combined flow, every IDC supports it). Omitting `build` selects the\nsplit flow: the Template and a `waiting` initial Build are created\nwithout starting anything, and the Build is started later via\n`POST /templates/{template_id}/builds/{id}`. The split flow is not\nsupported in every IDC; unsupported IDCs reject it with 422.\n"
+            },
+            "description": {
+              "description": "Human-readable Template description.",
+              "maxLength": 256,
+              "type": "string"
+            },
+            "idc_name": {
+              "description": "IDC that permanently owns the Template. Optional: omitted, empty, and whitespace-only values are equivalent — the organization's configured default data center is used (maintained by the platform administrator; the same setting used by sandbox creation). If the organization has no default configured, the request returns 400.\n",
+              "type": "string"
+            },
+            "labels": {
+              "additionalProperties": {
+                "maxLength": 256,
+                "type": "string"
+              },
+              "description": "User-defined labels used for filtering.",
+              "maxProperties": 64,
+              "type": "object"
+            },
+            "name": {
+              "description": "Organization-scoped Template display name.",
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "type": "string"
+            },
+            "resources": {
+              "description": "Resource values may be selected by catalog product SKU or supplied as a\ncustom configuration. Active presets use operator-managed IDC product\nvalues without custom-resource limit validation. Only custom values\nmust pass the 16 vCPU / 64 GiB memory / 64 GiB boot disk limits and the\nselected IDC's representability checks.\n",
+              "discriminator": {
+                "mapping": {
+                  "custom": "#/components/schemas/CustomResourceSelection",
+                  "preset": "#/components/schemas/PresetResourceSelection"
+                },
+                "propertyName": "type"
+              },
+              "oneOf": [
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "product": {
+                      "description": "Sandbox product specification id (catalog SKU, for example\n`gmi.sandbox.x-large`).\n",
+                      "type": "string"
+                    },
+                    "type": {
+                      "enum": [
+                        "preset"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "product"
+                  ],
+                  "type": "object"
+                },
+                {
+                  "additionalProperties": false,
+                  "properties": {
+                    "architecture": {
+                      "default": "x86_64",
+                      "description": "Requested CPU architecture. If omitted, x86_64 is used. The\nselected IDC must support the value.\n",
+                      "enum": [
+                        "x86_64",
+                        "arm64"
+                      ],
+                      "type": "string"
+                    },
+                    "cpu_count": {
+                      "description": "Requested integer vCPU count. Custom resources allow at most\n16 vCPU.\n",
+                      "maximum": 16,
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "disk_size_mb": {
+                      "description": "Requested integer boot disk size in MiB. Custom resources allow at\nmost 65536 MiB (64 GiB).\n",
+                      "maximum": 65536,
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "memory_mb": {
+                      "description": "Requested integer memory size in MiB. Custom resources allow at\nmost 65536 MiB (64 GiB).\n",
+                      "maximum": 65536,
+                      "minimum": 1,
+                      "type": "integer"
+                    },
+                    "type": {
+                      "enum": [
+                        "custom"
+                      ],
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "type",
+                    "cpu_count",
+                    "memory_mb",
+                    "disk_size_mb"
+                  ],
+                  "type": "object"
+                }
+              ]
+            }
+          },
+          "required": [
+            "name",
+            "resources"
+          ],
+          "type": "object"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
@@ -2953,7 +4504,36 @@
             "type": "object"
           }
         ],
-        "required": true
+        "required": true,
+        "schema": {
+          "additionalProperties": false,
+          "description": "Mutable Template metadata patch. Omitted fields are left unchanged;\n`labels` replaces the stored map wholesale when provided.\n",
+          "minProperties": 1,
+          "properties": {
+            "description": {
+              "description": "New human-readable description.",
+              "maxLength": 256,
+              "type": "string"
+            },
+            "labels": {
+              "additionalProperties": {
+                "maxLength": 256,
+                "type": "string"
+              },
+              "description": "Complete replacement of user-defined labels.",
+              "maxProperties": 64,
+              "type": "object"
+            },
+            "name": {
+              "description": "New organization-scoped display name.",
+              "maxLength": 64,
+              "minLength": 1,
+              "pattern": "^[A-Za-z0-9_-]+$",
+              "type": "string"
+            }
+          },
+          "type": "object"
+        }
       },
       "returns_binary": false,
       "security_scheme": "bearerAuth",
