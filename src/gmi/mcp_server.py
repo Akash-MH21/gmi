@@ -119,10 +119,9 @@ def input_schema(operation):
             if location == 'path' or param.get('required'):
                 required.append(name)
     body = operation.get('request_body')
-    if body:
-        properties['body'] = copy.deepcopy(body.get('schema') or {'type': 'object'})
-        if body.get('required'):
-            required.append('body')
+    properties['body'] = copy.deepcopy((body or {}).get('schema') or {'type': 'object'})
+    if body and body.get('required'):
+        required.append('body')
     return {'type': 'object', 'properties': properties, 'required': required, 'additionalProperties': False}
 
 
@@ -199,14 +198,16 @@ def execute_curated(name, arguments, timeout):
                 response = client.post('chat/completions', json={'model': model,
                     'messages': [{'role': 'user', 'content': arguments['message']}],
                     field: arguments.get('max_tokens', 256), 'stream': False})
+        if response.status_code in (401, 403):
+            raise GMIError(f'Inference HTTP {response.status_code}; set GMI_API_KEY to an inference key with ie_model scope.')
         from .api import check_response
         check_response(response, arguments.get('model', '<default>'))
         value = response.json()
         if name == 'gmi_models':
             search = arguments.get('search', '').casefold()
             rows = [row for row in value.get('data', []) if search in json.dumps(row).casefold()]
-            return {'models': rows[:arguments.get('limit', 50)], 'total': len(rows)}
-        return {'reply': value['choices'][0]['message'].get('content') or '', 'usage': value.get('usage', {})}
+            return redact({'models': rows[:arguments.get('limit', 50)], 'total': len(rows)}, [key])
+        return redact({'reply': value['choices'][0]['message'].get('content') or '', 'usage': value.get('usage', {})}, [key])
 
     from .sandbox import SandboxClient
     client = SandboxClient()
@@ -250,6 +251,20 @@ def test_base(default):
     return os.environ.get('GMI_MCP_TEST_BASE', default).rstrip('/') if os.environ.get('GMI_MCP_TEST_MODE') == '1' else default
 
 
+def sensitive_values(value):
+    """Remember returned credentials so echoed copies are also removed."""
+    found = set()
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if re.search(r'token|secret|password|api_key', key, re.I) and isinstance(item, str):
+                found.add(item)
+            found.update(sensitive_values(item))
+    elif isinstance(value, list):
+        for item in value:
+            found.update(sensitive_values(item))
+    return found
+
+
 def redact(value, secrets=()):
     if isinstance(value, dict):
         return {key: '[redacted]' if re.search(r'token|secret|password|api_key', key, re.I) else redact(item, secrets)
@@ -263,7 +278,7 @@ def redact(value, secrets=()):
         except (ValueError, TypeError):
             parsed = None
         if isinstance(parsed, (dict, list)):
-            value = json.dumps(redact(parsed, secrets), ensure_ascii=False)
+            value = json.dumps(redact(parsed, set(secrets) | sensitive_values(parsed)), ensure_ascii=False)
         value = re.sub(r'\beyJ[A-Za-z0-9_-]*\.[A-Za-z0-9_-]+\.[A-Za-z0-9_-]+\b', '[redacted]', value)
         for secret in sorted(set(secrets), key=len, reverse=True):
             if secret:
@@ -273,6 +288,7 @@ def redact(value, secrets=()):
 
 def hygienic_result(value, max_output_bytes=65536, is_error=False, secrets=()):
     """Bound text and structured content together so neither bypasses hygiene."""
+    secrets = set(secrets) | sensitive_values(value)
     value = redact(value, secrets)
     text = json.dumps(value, ensure_ascii=False)
     encoded = text.encode('utf-8')
@@ -341,35 +357,34 @@ async def run_server(max_output_bytes=65536, timeout=60, **options):
         return types.ListToolsResult(tools=[types.Tool(**{key: row[key] for key in ('name', 'description', 'inputSchema', 'annotations')}) for row in rows])
 
     async def call_tool(ctx, params):
-        secrets = []
-        for service in ('iam', 'sandbox', 'cluster'):
-            key, _, _ = _credential(service, allow_missing=True)
-            if key:
-                secrets.append(key)
+        from mcp.shared.exceptions import MCPError
+        row = registered.get(params.name)
+        if row is None:
+            other = all_rows.get(params.name)
+            flag = ('--allow-destructive' if other['class'] == 'destructive' else '--allow-write') if other and other['class'] != 'read' else None
+            message = (f'Tool is not registered; enable {flag} and check --services/--include/--exclude.' if flag else
+                       'Tool is not registered; check name and --services/--include/--exclude.')
+            # Let the SDK encode this protocol error. Never echo an arbitrary name.
+            raise MCPError(code=-32602, message=message)
+        secrets = [os.environ[name] for name in ('GMI_API_KEY', 'GMI_COMPUTE_API_KEY',
+                   'GMI_SANDBOX_API_KEY', 'GMI_TOKEN') if os.environ.get(name)]
         try:
-            row = registered.get(params.name)
-            if row is None:
-                other = all_rows.get(params.name)
-                flag = ('--allow-destructive' if other['class'] == 'destructive' else '--allow-write') if other and other['class'] != 'read' else None
-                message = 'Tool is not registered.'
-                if flag:
-                    message += f' Enable {flag} and ensure --services, --include and --exclude allow it.'
-                else:
-                    message += ' Check the name and --services, --include and --exclude filters.'
-                result = hygienic_result({'code': -32602, 'message': message}, max_output_bytes, True, secrets)
+            for service in ('iam', 'sandbox', 'cluster'):
+                key, _, _ = _credential(service, allow_missing=True)
+                if key:
+                    secrets.append(key)
+            arguments = params.arguments or {}
+            try:
+                jsonschema.validate(arguments, row['inputSchema'])
+            except jsonschema.ValidationError as error:
+                # ValidationError.message includes user-controlled values.
+                raise GMIError('Invalid tool arguments: schema constraint ' + str(error.validator) + ' failed.') from None
+            if row['curated']:
+                value = await anyio.to_thread.run_sync(lambda: execute_curated(params.name, arguments, timeout))
+                error = False
             else:
-                arguments = params.arguments or {}
-                try:
-                    jsonschema.validate(arguments, row['inputSchema'])
-                except jsonschema.ValidationError as error:
-                    # ValidationError.message includes user-controlled values.
-                    raise GMIError('Invalid tool arguments: schema constraint ' + str(error.validator) + ' failed.') from None
-                if row['curated']:
-                    value = await anyio.to_thread.run_sync(lambda: execute_curated(params.name, arguments, timeout))
-                    error = False
-                else:
-                    value, error = await anyio.to_thread.run_sync(lambda: execute_operation(operations[params.name], arguments, timeout))
-                result = hygienic_result(value, max_output_bytes, error, secrets)
+                value, error = await anyio.to_thread.run_sync(lambda: execute_operation(operations[params.name], arguments, timeout))
+            result = hygienic_result(value, max_output_bytes, error, secrets)
         except (GMIError, click.ClickException) as error:
             result = hygienic_result({'message': str(error)}, max_output_bytes, True, secrets)
         except httpx.RequestError:

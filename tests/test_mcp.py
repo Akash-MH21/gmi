@@ -1,0 +1,438 @@
+"""Offline MCP tests. The local HTTP server is a fixture, not live API proof."""
+import asyncio
+import builtins
+from collections import Counter
+from contextlib import asynccontextmanager
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+import importlib
+import json
+import os
+from pathlib import Path
+import re
+import sys
+import threading
+from uuid import UUID
+
+from click.testing import CliRunner
+import httpx
+import pytest
+
+from gmi.cli import main
+from gmi import mcp_server as mcp
+from gmi.api_commands import manifest
+from gmi.config import GMIError
+
+
+@pytest.fixture(autouse=True)
+def isolated_credentials(monkeypatch, tmp_path):
+    monkeypatch.setenv('HOME', str(tmp_path))
+    for key in ('GMI_API_KEY', 'GMI_TOKEN', 'GMI_COMPUTE_API_KEY', 'GMI_SANDBOX_API_KEY',
+                'GMI_MCP_TEST_MODE', 'GMI_MCP_TEST_BASE'):
+        monkeypatch.delenv(key, raising=False)
+
+
+def operation(name):
+    return next(op for op in manifest()['operations'] if mcp.tool_name(op) == name)
+
+
+def test_names_unique_valid_and_stably_shortened():
+    rows = mcp.generated_tools() + mcp.curated_tools()
+    names = [row['name'] for row in rows]
+    assert len(names) == len(set(names))
+    assert all(re.fullmatch(r'[A-Za-z0-9_-]{1,64}', name) for name in names)
+    assert mcp.tool_name({'service': 'sandbox', 'name': 'get-sandbox'}) == 'sandbox_get_sandbox'
+    long = {'service': 'cluster', 'name': 'a' * 100}
+    assert len(mcp.tool_name(long)) == 64
+    assert mcp.tool_name(long) == mcp.tool_name(dict(long))
+    assert mcp.tool_name(long) != mcp.tool_name({**long, 'name': 'a' * 99 + 'b'})
+
+
+def test_schemas_path_body_enum_and_annotations():
+    import jsonschema
+    for row in mcp.generated_tools() + mcp.curated_tools():
+        jsonschema.Draft202012Validator.check_schema(row['inputSchema'])
+        assert row['inputSchema']['additionalProperties'] is False
+        assert row['annotations']['openWorldHint'] is True
+    get = mcp.input_schema(operation('sandbox_get_sandbox'))
+    assert get['properties']['id'] == {'type': 'string'}
+    assert get['required'] == ['id']
+    create = operation('sandbox_create_sandbox')
+    schema = mcp.input_schema(create)
+    assert 'Idempotency-Key' not in schema['properties']
+    assert schema['properties']['body'] == create['request_body']['schema']
+    assert 'body' in schema['required']
+    assert 'template_id' in schema['properties']['body']['required']
+    query = mcp.input_schema(operation('sandbox_get_template_build_logs'))
+    assert query['properties']['level'] == {'type': 'string', 'enum': ['debug', 'info', 'warn', 'error']}
+    rows = {row['name']: row for row in mcp.generated_tools()}
+    assert rows['sandbox_get_sandbox']['annotations'] == {
+        'readOnlyHint': True, 'destructiveHint': False, 'idempotentHint': True, 'openWorldHint': True}
+    assert rows['sandbox_delete_sandbox']['annotations']['destructiveHint'] is True
+    assert rows['sandbox_delete_sandbox']['annotations']['idempotentHint'] is True
+
+
+@pytest.mark.parametrize('flags,methods,curated', [
+    ([], {'GET'}, {'gmi_models', 'gmi_chat', 'gmi_sandbox_get_file'}),
+    (['--allow-write'], {'GET', 'POST', 'PUT', 'PATCH'},
+     {'gmi_models', 'gmi_chat', 'gmi_sandbox_get_file', 'gmi_sandbox_run', 'gmi_sandbox_exec', 'gmi_sandbox_put_file'}),
+    (['--allow-destructive'], {'GET', 'POST', 'PUT', 'PATCH', 'DELETE'},
+     {'gmi_models', 'gmi_chat', 'gmi_sandbox_get_file', 'gmi_sandbox_run', 'gmi_sandbox_exec', 'gmi_sandbox_put_file'}),
+])
+def test_gating_and_exact_cli_counts_from_manifest(flags, methods, curated):
+    # Independent policy oracle: do not use the implementation's eligible or select_tools.
+    allowed = [op for op in manifest()['operations']
+               if op['security_scheme'] not in {'sandboxAccessToken', 'bearerEmailVerificationToken'}
+               and op['name'] != 'create-api-key'
+               and not (op['service'] == 'iam' and op['group'] == 'oauth')
+               and op['method'] in methods]
+    result = CliRunner().invoke(main, ['mcp', 'tools', '--json', *flags])
+    assert result.exit_code == 0, result.output
+    report = json.loads(result.output)
+    expected_names = {op['service'] + '_' + op['name'].replace('-', '_') for op in allowed} | curated
+    assert {row['name'] for row in report['tools']} == expected_names
+    counts = Counter('read' if op['method'] == 'GET' else 'destructive' if op['method'] == 'DELETE' else 'write' for op in allowed)
+    counts['read'] += 3
+    counts['write'] += len(curated) - 3
+    assert report['counts'] == {**{kind: counts[kind] for kind in ('read', 'write', 'destructive')},
+                                'curated': len(curated), 'total': len(expected_names)}
+    for op in manifest()['operations']:
+        if op['security_scheme'] in {'sandboxAccessToken', 'bearerEmailVerificationToken'} or op['name'] == 'create-api-key' or (op['service'] == 'iam' and op['group'] == 'oauth'):
+            assert mcp.tool_name(op) not in expected_names
+
+
+def test_service_and_glob_filters():
+    result = CliRunner().invoke(main, ['mcp', 'tools', '--json', '--services', 'sandbox',
+        '--include', 'sandbox_get_*', '--include', 'gmi_*', '--exclude', '*file*'])
+    assert result.exit_code == 0
+    names = {row['name'] for row in json.loads(result.output)['tools']}
+    assert 'gmi_models' in names and 'gmi_chat' in names and 'sandbox_get_sandbox' in names
+    assert not any('file' in name for name in names)
+    assert not any(name.startswith('iam_') for name in names)
+    assert CliRunner().invoke(main, ['mcp', 'tools', '--services', 'typo']).exit_code == 2
+
+
+def test_auto_idempotency_and_shared_key_selection(monkeypatch):
+    monkeypatch.setenv('GMI_API_KEY', 'fake-inference')
+    monkeypatch.setenv('GMI_COMPUTE_API_KEY', 'fake-compute')
+    calls = []
+    def handler(request):
+        calls.append(request)
+        return httpx.Response(200, json={'id': 'created'})
+    original = httpx.Client
+    monkeypatch.setattr(mcp.httpx, 'Client', lambda **kw: original(transport=httpx.MockTransport(handler), **kw))
+    for _ in range(2):
+        value, error = mcp.execute_operation(operation('sandbox_create_sandbox'), {'body': {'template_id': 't'}}, 17)
+        assert value == {'id': 'created'} and not error
+    ids = [str(UUID(request.headers['Idempotency-Key'])) for request in calls]
+    assert ids[0] != ids[1]
+    assert all(request.headers['Authorization'] == 'Bearer fake-compute' for request in calls)
+    assert all(request.headers['User-Agent'] == 'gmi-mcp/' + mcp.__version__ for request in calls)
+    assert all(request.extensions['timeout']['read'] == 17 for request in calls)
+
+
+@pytest.mark.parametrize('status', [401, 403, 429, 500])
+def test_http_errors_preserve_service_message_and_scope_hint(monkeypatch, status):
+    monkeypatch.setenv('GMI_COMPUTE_API_KEY', 'fake-compute')
+    original = httpx.Client
+    monkeypatch.setattr(mcp.httpx, 'Client', lambda **kw: original(
+        transport=httpx.MockTransport(lambda request: httpx.Response(status, json={'message': 'service says no'})), **kw))
+    value, error = mcp.execute_operation(operation('sandbox_get_sandbox'), {'id': 'box'}, 60)
+    assert error and value['status'] == status and value['message']['message'] == 'service says no'
+    if status in (401, 403):
+        assert 'GMI_COMPUTE_API_KEY' in value['hint'] and 'compute scope' in value['hint']
+
+
+def test_redaction_nested_keys_jwt_and_known_credentials():
+    jwt = 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.c2lnbmF0dXJl'
+    payload = {'sandbox_access_token': 'fake-access', 'nested': [{'API_KEY': 'fake-key', 'clientSecret': 'secret',
+               'PASSWORD': 'password', 'reply': 'Bearer ' + jwt, 'echo': 'fake-compute'}],
+               'json_text': '{"password":"hidden"}'}
+    result = mcp.hygienic_result(payload, secrets=['fake-compute'])
+    rendered = json.dumps(result)
+    for secret in ('fake-access', 'fake-key', 'fake-compute', 'secret"', 'password"', jwt, 'hidden'):
+        assert secret not in rendered
+    assert result['structuredContent']['sandbox_access_token'] == '[redacted]'
+    assert result['structuredContent']['nested'][0]['reply'] == 'Bearer [redacted]'
+    assert '[redacted]' in rendered
+
+
+@pytest.mark.parametrize('value', [{'long': 'é' * 5000}, ['x' * 5000], 'x' * 5000])
+def test_truncation_bounds_utf8_and_drops_unbounded_structured_content(value):
+    result = mcp.hygienic_result(value, max_output_bytes=256)
+    text = result['content'][0]['text']
+    assert len(text.encode('utf-8')) <= 256
+    assert re.search(r'\[truncated \d+ bytes\]$', text)
+    assert result['structuredContent'] is None
+    prefix, marker = text.rsplit('\n', 1)
+    removed = int(re.search(r'\d+', marker).group())
+    assert removed == len(json.dumps(value, ensure_ascii=False).encode()) - len(prefix.encode())
+
+
+def test_test_base_requires_both_variables(monkeypatch):
+    monkeypatch.setenv('GMI_MCP_TEST_BASE', 'http://127.0.0.1:1')
+    assert mcp.test_base('https://real.example') == 'https://real.example'
+    monkeypatch.setenv('GMI_MCP_TEST_MODE', '0')
+    assert mcp.test_base('https://real.example') == 'https://real.example'
+    monkeypatch.setenv('GMI_MCP_TEST_MODE', '1')
+    assert mcp.test_base('https://real.example') == 'http://127.0.0.1:1'
+
+
+def test_missing_sdk_hint_and_tools_do_not_import_sdk(monkeypatch):
+    original = builtins.__import__
+    def blocked(name, *args, **kwargs):
+        if name == 'mcp' or name.startswith('mcp.') or name == 'mcp_types':
+            raise ImportError('blocked for offline test')
+        return original(name, *args, **kwargs)
+    monkeypatch.setattr(builtins, '__import__', blocked)
+    runner = CliRunner(mix_stderr=False)
+    result = runner.invoke(main, ['mcp', 'serve'])
+    assert result.exit_code == 2
+    assert result.stdout == ''
+    assert result.stderr.strip() == 'MCP SDK missing; install with: pip install "gmi[mcp]"'
+    assert len(result.stderr.splitlines()) == 1
+    assert runner.invoke(main, ['mcp', 'tools', '--json']).exit_code == 0
+
+
+@pytest.mark.parametrize('client', ['codex', 'claude-code', 'cursor'])
+def test_config_has_no_credentials_and_preserves_write_flag(client, monkeypatch):
+    monkeypatch.setenv('GMI_API_KEY', 'fake-do-not-print')
+    result = CliRunner().invoke(main, ['mcp', 'config', '--client', client, '--allow-write'])
+    assert result.exit_code == 0 and '--allow-write' in result.output
+    assert 'fake-do-not-print' not in result.output
+    assert 'where the client runs' in result.output
+    if client == 'codex':
+        assert 'codex mcp add gmi -- gmi mcp serve --allow-write' in result.output
+        assert '[mcp_servers.gmi]' in result.output
+    elif client == 'claude-code':
+        assert 'claude mcp add --transport stdio gmi -- gmi mcp serve --allow-write' in result.output
+    else:
+        snippet = result.output[result.output.index('{'):]
+        assert json.loads(snippet)['mcpServers']['gmi']['args'] == ['mcp', 'serve', '--allow-write']
+
+
+@pytest.fixture
+def local_cloud():
+    calls = []
+    class Handler(BaseHTTPRequestHandler):
+        def log_message(self, *args):
+            pass
+        def do_GET(self):
+            calls.append((self.path, dict(self.headers)))
+            payload = {'id': 'box', 'state': 'running', 'sandbox_access_token': 'fake-data-secret',
+                       'message': 'eyJhbGciOiJIUzI1NiJ9.eyJzdWIiOiIxMjMifQ.c2lnbmF0dXJl'}
+            body = json.dumps(payload).encode()
+            self.send_response(403 if self.path.endswith('/rejected') else 200)
+            self.send_header('Content-Type', 'application/json')
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+    server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    try:
+        yield f'http://127.0.0.1:{server.server_port}', calls
+    finally:
+        server.shutdown()
+        server.server_close()
+        thread.join(timeout=5)
+
+
+@pytest.mark.parametrize('mode,version', [('2026-07-28', '2026-07-28'), ('legacy', '2025-11-25')])
+def test_official_client_stdio_protocol_and_stdout_hygiene(local_cloud, tmp_path, monkeypatch, mode, version):
+    from mcp.client import Client
+    from mcp.shared.exceptions import MCPError
+    from mcp.client.stdio import StdioServerParameters, stdio_client
+    stdio_module = importlib.import_module('mcp.client.stdio')
+    # Observe every complete stdout line at the official client's parser boundary.
+    original_parse = stdio_module._parse_line
+    stdout_lines = []
+    def record(line):
+        stdout_lines.append(line)
+        return original_parse(line)
+    monkeypatch.setattr(stdio_module, '_parse_line', record)
+    base, calls = local_cloud
+    params = StdioServerParameters(command=sys.executable,
+        args=['-c', 'from gmi.cli import main; main()', 'mcp', 'serve'],
+        env={'HOME': str(tmp_path), 'GMI_COMPUTE_API_KEY': 'fake-protocol-key',
+             'GMI_MCP_TEST_MODE': '1', 'GMI_MCP_TEST_BASE': base})
+    stderr_path = tmp_path / 'server.stderr'
+    async def exercise():
+        with stderr_path.open('w') as errlog:
+            @asynccontextmanager
+            async def transport():
+                async with stdio_client(params, errlog=errlog) as streams:
+                    yield streams
+            async with Client(transport(), mode=mode, read_timeout_seconds=15, cache=None) as client:
+                assert client.protocol_version == version
+                listed = await client.list_tools()
+                names = {tool.name for tool in listed.tools}
+                assert 'sandbox_get_sandbox' in names
+                assert 'sandbox_create_sandbox' not in names
+                assert names == {row['name'] for row in mcp.select_tools()}
+                result = await client.call_tool('sandbox_get_sandbox', {'id': 'a/b'})
+                assert not result.is_error
+                assert result.structured_content['id'] == 'box'
+                assert result.structured_content['sandbox_access_token'] == '[redacted]'
+                assert result.structured_content['message'] == '[redacted]'
+                with pytest.raises(MCPError, match='--allow-write') as gated:
+                    await client.call_tool('sandbox_create_sandbox', {'body': {'template_id': 't'}})
+                assert gated.value.code == -32602
+                with pytest.raises(MCPError, match='--allow-destructive'):
+                    await client.call_tool('sandbox_delete_sandbox', {'id': 'box'})
+                bad = await client.call_tool('sandbox_get_sandbox', {'id': 123})
+                assert bad.is_error and 'Invalid tool arguments' in bad.content[0].text
+                extra = await client.call_tool('sandbox_get_sandbox', {'id': 'box', 'surprise': True})
+                assert extra.is_error
+                capped = await client.call_tool('gmi_chat', {'message': 'hello', 'max_tokens': 1025})
+                assert capped.is_error
+                rejected = await client.call_tool('sandbox_get_sandbox', {'id': 'rejected'})
+                assert rejected.is_error and rejected.structured_content['status'] == 403
+                assert 'GMI_COMPUTE_API_KEY' in rejected.content[0].text
+                assert 'fake-data-secret' not in rejected.content[0].text
+    asyncio.run(exercise())
+    assert len(calls) == 2
+    assert calls[0][0] == '/sandboxes/a%2Fb'
+    assert calls[0][1]['Authorization'] == 'Bearer fake-protocol-key'
+    assert calls[0][1]['User-Agent'] == 'gmi-mcp/' + mcp.__version__
+    assert stdout_lines
+    for line in stdout_lines:
+        parsed = json.loads(line)
+        assert parsed['jsonrpc'] == '2.0'
+        assert ('result' in parsed) or ('error' in parsed) or ('method' in parsed)
+    all_output = '\n'.join(stdout_lines) + stderr_path.read_text()
+    assert 'fake-protocol-key' not in all_output and 'fake-data-secret' not in all_output
+    assert 'eyJhbGciOiJIUzI1NiJ9' not in all_output
+
+
+@pytest.fixture
+def sandbox_cloud(monkeypatch):
+    from gmi import sandbox
+    monkeypatch.setenv('GMI_API_KEY', 'fake-inference-key')
+    monkeypatch.setenv('GMI_COMPUTE_API_KEY', 'fake-compute-key')
+    state = {'calls': [], 'connections': 0, 'content': b'hello', 'exec_failure': False}
+    def handler(request):
+        state['calls'].append(request)
+        assert request.headers['User-Agent'] == 'gmi-mcp/' + mcp.__version__
+        if request.url.host == 'box.example.test':
+            assert 'Authorization' not in request.headers
+            assert request.headers['X-Access-Token'] == f"fake-access-{state['connections']}"
+            if request.url.path == '/executions':
+                if state['exec_failure']:
+                    return httpx.Response(500, json={'error': 'command rejected'})
+                assert json.loads(request.content)['parameters']['command'] == 'echo hello'
+                return httpx.Response(200, json={'stdout': 'hello fake-access-1', 'stderr': '', 'exit_code': 3, 'status': 'completed'})
+            assert request.url.path == '/files'
+            assert request.url.params['path'] == '/tmp/data.txt'
+            if request.method == 'GET':
+                return httpx.Response(200, content=state['content'])
+            assert b'hello' in request.content
+            return httpx.Response(200, json={'path': '/tmp/data.txt', 'sandbox_access_token': 'fake-access-1'})
+        assert request.headers['Authorization'] == 'Bearer fake-compute-key'
+        assert 'X-Access-Token' not in request.headers
+        path = request.url.path.removeprefix('/api/v2')
+        if path == '/templates':
+            if request.method == 'GET':
+                return httpx.Response(200, json={'items': [], 'total': 0})
+            return httpx.Response(200, json={'id': 'template'})
+        if path == '/templates/template':
+            return httpx.Response(200, json={'latest_build_status': 'ready'})
+        if path == '/sandboxes' and request.method == 'POST':
+            assert json.loads(request.content)['timeout'] <= 300
+            return httpx.Response(200, json={'id': 'box'})
+        if path == '/sandboxes/box/connect':
+            state['connections'] += 1
+            return httpx.Response(200, json={'sandbox_key': 'box', 'domain': 'example.test',
+                'sandbox_access_token': f"fake-access-{state['connections']}"})
+        if path == '/sandboxes/box':
+            return httpx.Response(200, json={'state': 'running', 'id': 'box'})
+        raise AssertionError('Unexpected fake sandbox path')
+    monkeypatch.setattr(sandbox, 'HTTPTransport', lambda: httpx.MockTransport(handler))
+    return state
+
+
+def test_curated_sandbox_run_exec_and_fresh_internal_connections(sandbox_cloud):
+    state = sandbox_cloud
+    run = mcp.execute_curated('gmi_sandbox_run', {'image': 'ubuntu:24.04', 'command': ['echo', 'hello'], 'timeout': 45}, 13)
+    assert run == {'stdout': 'hello [redacted]', 'stderr': '', 'exit_code': 3}
+    assert any(r.method == 'DELETE' and r.url.path.endswith('/sandboxes/box') for r in state['calls'])
+    execute = mcp.execute_curated('gmi_sandbox_exec', {'sandbox_id': 'box', 'command': ['echo', 'hello']}, 13)
+    assert execute['exit_code'] == 3
+    assert state['connections'] == 2
+    assert all(r.extensions['timeout']['read'] == 13 for r in state['calls'])
+    assert not any('fake-access' in str(v) for v in run.values())
+
+
+def test_curated_sandbox_run_cleanup_on_execution_failure(sandbox_cloud):
+    state = sandbox_cloud
+    state['exec_failure'] = True
+    with pytest.raises(GMIError):
+        mcp.execute_curated('gmi_sandbox_run', {'image': 'ubuntu:24.04', 'command': ['echo', 'hello']}, 60)
+    assert state['calls'][-1].method == 'DELETE'
+    assert state['calls'][-1].url.path.endswith('/sandboxes/box')
+
+
+def test_curated_file_roundtrip_limits_and_no_host_file_access(sandbox_cloud):
+    put = mcp.execute_curated('gmi_sandbox_put_file', {'sandbox_id': 'box', 'path': '/tmp/data.txt', 'content': 'hello'}, 60)
+    assert put['sandbox_access_token'] == '[redacted]'
+    get = mcp.execute_curated('gmi_sandbox_get_file', {'sandbox_id': 'box', 'path': '/tmp/data.txt'}, 60)
+    assert get == {'content': 'hello', 'bytes': 5}
+    assert sandbox_cloud['connections'] == 2
+    sandbox_cloud['content'] = b'x' * 262145
+    with pytest.raises(GMIError, match='256 KB'):
+        mcp.execute_curated('gmi_sandbox_get_file', {'sandbox_id': 'box', 'path': '/tmp/data.txt'}, 60)
+    sandbox_cloud['content'] = b'\xff\xfe'
+    with pytest.raises(GMIError, match='Binary file omitted'):
+        mcp.execute_curated('gmi_sandbox_get_file', {'sandbox_id': 'box', 'path': '/tmp/data.txt'}, 60)
+    with pytest.raises(GMIError, match='256 KB'):
+        mcp.execute_curated('gmi_sandbox_put_file', {'sandbox_id': 'box', 'path': '/tmp/data.txt', 'content': 'é' * 131073}, 60)
+
+
+def test_curated_inference_key_models_search_and_chat_usage(monkeypatch):
+    monkeypatch.setenv('GMI_API_KEY', 'fake-inference')
+    monkeypatch.setenv('GMI_COMPUTE_API_KEY', 'fake-compute')
+    requests = []
+    def handler(request):
+        requests.append(request)
+        assert request.headers['Authorization'] == 'Bearer fake-inference'
+        assert request.headers['User-Agent'] == 'gmi-mcp/' + mcp.__version__
+        if request.url.path.endswith('/models'):
+            return httpx.Response(200, json={'data': [{'id': 'a/first'}, {'id': 'b/second'}, {'id': 'a/third'}]})
+        assert request.url.path.endswith('/chat/completions')
+        body = json.loads(request.content)
+        assert body['messages'] == [{'role': 'user', 'content': 'hello'}]
+        assert body['max_completion_tokens'] == 16
+        return httpx.Response(200, json={'choices': [{'message': {'content': 'reply'}}], 'usage': {'total_tokens': 16}})
+    original = httpx.Client
+    monkeypatch.setattr(mcp.httpx, 'Client', lambda **kw: original(transport=httpx.MockTransport(handler), **kw))
+    result = mcp.execute_curated('gmi_models', {'search': 'a/', 'limit': 1}, 60)
+    assert result == {'models': [{'id': 'a/first'}], 'total': 2}
+    result = mcp.execute_curated('gmi_chat', {'message': 'hello', 'max_tokens': 16}, 60)
+    assert result == {'reply': 'reply', 'usage': {'total_tokens': '[redacted]'}}
+    assert len(requests) == 2
+
+
+@pytest.mark.parametrize('name,args', [
+    ('gmi_chat', {'message': 'hello', 'max_tokens': 1025}),
+    ('gmi_sandbox_run', {'image': 'ubuntu', 'command': ['true'], 'timeout': 301}),
+    ('gmi_sandbox_exec', {'sandbox_id': 'box', 'command': []}),
+    ('gmi_sandbox_get_file', {'sandbox_id': 'box', 'path': '/tmp/a', 'access_token': 'never-accept'}),
+])
+def test_curated_argument_safety_constraints(name, args):
+    import jsonschema
+    schema = next(row['inputSchema'] for row in mcp.curated_tools() if row['name'] == name)
+    with pytest.raises(jsonschema.ValidationError):
+        jsonschema.validate(args, schema)
+
+
+def test_returned_credentials_are_also_removed_from_echoed_fields():
+    result = mcp.hygienic_result({'sandbox_access_token': 'fake-new-token',
+                                 'message': 'echo fake-new-token', 'nested': {'password': 'private-value'},
+                                 'copy': 'private-value'})
+    assert result['structuredContent']['message'] == 'echo [redacted]'
+    assert result['structuredContent']['copy'] == '[redacted]'
+
+
+def test_no_manifest_body_still_allows_an_optional_free_object():
+    schema = mcp.input_schema(operation('sandbox_get_sandbox'))
+    assert schema['properties']['body'] == {'type': 'object'}
+    assert 'body' not in schema['required']
