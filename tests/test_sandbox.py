@@ -1,4 +1,4 @@
-"""Offline contract tests. Data plane behavior is unverified live."""
+"""Offline contract tests. Owner live verification is recorded in docs/AGENTBOX.md."""
 import httpx
 from click.testing import CliRunner
 
@@ -136,8 +136,8 @@ class FakeCloud:
                       'metadata': {'echo': ACCESS, 'traffic_access_token': TRAFFIC}}
             detail.update(self.sandbox_detail)
             if state in ('deleted', 'deleting'):
-                detail['deletion'] = {'code': 'Sandbox.BillingNoPermission', 'initiator': 'billing',
-                                      'message': 'Deleted by platform: billing is not permitted'}
+                detail.setdefault('deletion', {'code': 'Sandbox.BillingNoPermission', 'initiator': 'billing',
+                                               'message': 'Deleted by platform: billing is not permitted'})
             return httpx.Response(200, json={'data': detail})
         raise AssertionError(f'Unexpected control request {request.method} {path}')
 
@@ -592,6 +592,44 @@ def test_deleted_get_block(display_cloud, state):
     result = invoke(['get', 'box', '--json'])
     assert result.exit_code == 1
     assert result.stdout == ''
+
+
+@pytest.mark.parametrize('state', ['deleting', 'deleted'])
+@pytest.mark.parametrize('as_json', [False, True])
+def test_user_deleted_get_is_plain_state(display_cloud, state, as_json):
+    display_cloud.states = [state]
+    deletion = {'code': 'Sandbox.UserDeleted', 'initiator': 'user',
+                'message': 'Deleted by user request'}
+    display_cloud.sandbox_detail['deletion'] = deletion
+    result = invoke(['get', 'box', *(['--json'] if as_json else [])])
+    assert_ok(result)
+    assert result.stderr == ''
+    if as_json:
+        value = json.loads(result.stdout)
+        assert value['state'] == state
+        assert value['deletion'] == deletion
+    else:
+        assert f'state: {state}\n' in result.stdout
+        assert 'deletion message: Deleted by user request\n' in result.stdout
+        assert 'initiator: user\n' in result.stdout
+    assert 'platform deletion' not in result.stdout
+    assert all(secret not in result.stdout for secret in (COMPUTE, ACCESS, TRAFFIC))
+
+
+@pytest.mark.parametrize('command', [
+    ['create', 'template', '--wait', '--yes'],
+    ['run', '--image', 'ubuntu:24.04', '--yes', '--', 'true'],
+])
+def test_user_deletion_stops_wait_without_platform_wording(cloud, command):
+    cloud.states = ['deleted']
+    cloud.sandbox_detail['deletion'] = {
+        'code': 'Sandbox.UserDeleted', 'initiator': 'user', 'message': 'Deleted by user request'}
+    result = invoke(command)
+    assert result.exit_code == 1
+    assert 'Deleted by user request' in result.stderr
+    assert 'platform deletion' not in result.stderr
+    assert len([r for r in cloud.requests if r.method == 'GET'
+                and r.url.path.endswith('/sandboxes/box')]) == 1
 
 
 @pytest.mark.parametrize('command,payload', [

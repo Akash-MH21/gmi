@@ -122,11 +122,15 @@ class SandboxClient:
                 return rows
             page += 1
 
-    def check_deletion(self, value):
+    def check_deletion(self, value, allow_user=False):
         deletion = value.get('deletion') or {}
         if value.get('state') in ('deleting', 'deleted') or deletion.get('requested_at') or deletion.get('code'):
+            user_deleted = deletion.get('initiator') == 'user'
+            if user_deleted and allow_user:
+                return
             reason = f"{deletion.get('message', 'Sandbox was deleted')} (code: {deletion.get('code', 'unknown')}; initiator: {deletion.get('initiator', 'unknown')})"
-            raise GMIError(self.scrub(reason) + '. This is a platform deletion, not a gmi error.')
+            suffix = '.' if user_deleted else '. This is a platform deletion, not a gmi error.'
+            raise GMIError(self.scrub(reason) + suffix)
 
     def wait_sandbox(self, sandbox_id, timeout=600):
         deadline = time.monotonic() + timeout
@@ -452,7 +456,7 @@ def sandbox_get(client, as_json, sandbox_id):
             fields.extend((label, deletion.get(key)) for label, key in
                           [('deletion code', 'code'), ('deletion message', 'message'), ('initiator', 'initiator')])
         human_details(client, fields)
-    client.check_deletion(value)
+    client.check_deletion(value, allow_user=True)
     if as_json:
         emit(client, value, True)
 
