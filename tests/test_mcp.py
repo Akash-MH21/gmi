@@ -238,13 +238,14 @@ def test_config_has_no_credentials_and_preserves_write_flag(client, monkeypatch)
     assert 'fake-do-not-print' not in result.output
     assert 'where the client runs' in result.output
     if client == 'codex':
-        assert 'codex mcp add gmi -- gmi mcp serve --allow-write' in result.output
+        assert 'codex mcp add' not in result.output
         assert '[mcp_servers.gmi]' in result.output
     elif client == 'claude-code':
-        assert 'claude mcp add --transport stdio gmi -- gmi mcp serve --allow-write' in result.output
+        assert "claude mcp add-json gmi '" in result.output
     else:
         snippet = result.output[result.output.index('{'):]
-        assert json.loads(snippet)['mcpServers']['gmi']['args'] == ['mcp', 'serve', '--allow-write']
+        block, _ = json.JSONDecoder().raw_decode(snippet)
+        assert block['mcpServers']['gmi']['args'] == ['mcp', 'serve', '--allow-write']
 
 
 @pytest.fixture

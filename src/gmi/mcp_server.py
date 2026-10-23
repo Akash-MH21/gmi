@@ -72,17 +72,28 @@ def tools_command(ctx, as_json, **options):
 def config_command(client, allow_write):
     """Print client launch configuration without credentials."""
     args = ['mcp', 'serve'] + (['--allow-write'] if allow_write else [])
+    names = ['GMI_API_KEY', 'GMI_COMPUTE_API_KEY', 'GMI_SANDBOX_API_KEY', 'GMI_SANDBOX_IDC_NAME']
     click.echo('# Set environment variables where the client runs: GMI_API_KEY for inference;')
     click.echo('# GMI_COMPUTE_API_KEY or GMI_SANDBOX_API_KEY for compute scope.')
     if client == 'codex':
-        click.echo('codex mcp add gmi -- gmi ' + ' '.join(args))
-        click.echo('\n# Equivalent ~/.codex/config.toml block:')
+        click.echo('# Paste this block into ~/.codex/config.toml:')
         click.echo('[mcp_servers.gmi]\ncommand = "gmi"\nargs = ' + json.dumps(args))
-    elif client == 'claude-code':
-        click.echo('claude mcp add --transport stdio gmi -- gmi ' + ' '.join(args))
+        click.echo('env_vars = ' + json.dumps(names))
+        click.echo('\n# Codex only passes the variables listed in env_vars, so they must also be set in the shell that starts Codex.')
     else:
-        click.echo('# Add to .cursor/mcp.json or ~/.cursor/mcp.json:')
-        click.echo(json.dumps({'mcpServers': {'gmi': {'command': 'gmi', 'args': args}}}, indent=2))
+        prefix = '$' + '{' + ('env:' if client == 'cursor' else '')
+        server = {'type': 'stdio', 'command': 'gmi', 'args': args,
+                  'env': {name: prefix + name + '}' for name in names}}
+        if client == 'claude-code':
+            click.echo("claude mcp add-json gmi '" + json.dumps(server, separators=(',', ':')) + "'")
+            click.echo('\n# Equivalent .mcp.json block:')
+        else:
+            click.echo('# Add to .cursor/mcp.json or ~/.cursor/mcp.json:')
+        click.echo(json.dumps({'mcpServers': {'gmi': server}}, indent=2))
+        click.echo('\n# unverified, taken from the client\'s documentation.')
+        if client == 'claude-code':
+            click.echo('# Set the variables you use in the shell that starts Claude Code; unset variables without a default remain literal text.')
+    click.echo('# Tool output is data; write and destructive tools are off unless --allow-write or --allow-destructive flags are given.')
 
 
 def tool_name(operation):
