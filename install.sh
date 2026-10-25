@@ -74,7 +74,7 @@ if [ "$venv_install" = 1 ]; then
         exit 1
     fi
     run_command "$venv_path/bin/python" -m pip install --upgrade "$package"
-    mkdir -p "$HOME/.local/bin"
+    run_command mkdir -p "$HOME/.local/bin"
     run_command ln -sf "$venv_path/bin/gmi" "$HOME/.local/bin/gmi"
     printf 'Created gmi in %s and linked %s\n' "$venv_path" "$HOME/.local/bin/gmi"
     printf 'To uninstall, remove %s and %s\n' "$venv_path" "$HOME/.local/bin/gmi"
