@@ -151,6 +151,10 @@ fi
     recorded = calls.read_text()
     assert "pip install --user" not in recorded
     assert "venv-python|-m pip install --upgrade" in recorded
+    second = subprocess.run(["/bin/sh", str(SCRIPT)], env=environment,
+                            text=True, capture_output=True)
+    assert second.returncode == 0, second.stderr
+    assert (tmp_path / ".local/bin/gmi").is_symlink()
 
 
 def test_venv_failure_prints_apt_hint_without_sudo(tmp_path):
