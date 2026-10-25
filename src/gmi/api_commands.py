@@ -3,6 +3,7 @@ import json, os, sys, re
 from pathlib import Path
 from urllib.parse import quote, urlencode
 import click, httpx
+from . import __version__
 from .config import GMIError, mask_key, resolve_key, read_key
 
 COMPUTE_HINT = " Set GMI_COMPUTE_API_KEY or GMI_SANDBOX_API_KEY to a console API key with compute scope; see gmi api check."
@@ -101,7 +102,7 @@ def api_check(service, token, idc_name, markdown, as_json):
         reasons = _check_skip_reasons(o, idc_name)
         if reasons: skipped.append({"operation":o["name"],"service":o["service"],"reasons":reasons}); continue
         try:
-            auth_headers={"User-Agent":"gmi-cli/0.1.0"}
+            auth_headers={"User-Agent":f"gmi-cli/{__version__}"}
             key, source, _ = _auth_for(o, token, allow_missing=True)
             if key and o["security_scheme"] in ("bearerAuth", "bearerAPIKey"):
                 auth_headers["Authorization"]="Bearer "+key
@@ -115,7 +116,7 @@ def api_check(service, token, idc_name, markdown, as_json):
     for value, info in credentials.items():
         scope = {"scope": None, "product": None}
         try:
-            with httpx.Client(headers={"Authorization":"Bearer "+value,"User-Agent":"gmi-cli/0.1.0"},timeout=30) as c:
+            with httpx.Client(headers={"Authorization":"Bearer "+value,"User-Agent":f"gmi-cli/{__version__}"},timeout=30) as c:
                 payload=c.get("https://console.gmicloud.ai/api/v1/me/api-keys/current").json()
                 payload=payload.get("key", payload); scope={"scope":payload.get("scope"),"product":payload.get("product")}
         except Exception: pass
@@ -203,7 +204,7 @@ def _request(o, path_values, query, headers, data, sets, token, access_token, ho
         if not yes and not sys.stdin.isatty(): raise click.ClickException("Refusing without a terminal; use --yes")
         if not yes and not click.confirm("Continue?", default=False): raise click.ClickException("Cancelled.")
     try:
-        with httpx.Client(headers={"User-Agent":"gmi-cli/0.1.0", **req_headers}, timeout=120) as client:
+        with httpx.Client(headers={"User-Agent":f"gmi-cli/{__version__}", **req_headers}, timeout=120) as client:
             response = client.request(o["method"], full, json=body)
     except httpx.RequestError as e: raise click.ClickException(f"Network error: {e}")
     if response.status_code >= 400:

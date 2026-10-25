@@ -35,7 +35,7 @@ def emit(value):
 
 
 @click.group(invoke_without_command=True)
-@click.version_option(__version__)
+@click.version_option(__version__, prog_name="gmi", message="%(prog)s %(version)s")
 @click.option("--api-key", help="API key; overrides environment and config.")
 @click.option("--json", "as_json", is_flag=True, help="Print JSON without prompts.")
 @click.pass_context
