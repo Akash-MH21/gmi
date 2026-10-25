@@ -9,7 +9,7 @@ Usage: sh install.sh [--mcp] [--help]
   --help   Show this help without installing.
 GMI_REF overrides the default tag v1.0.0.
 GMI_INSTALL_MCP=1 also includes the MCP SDK.
-Installer order: uv tool install, pipx install, python3 -m pip install --user.
+Installer order: uv tool install, pipx install, then pip or a private virtual environment.
 HELP
 }
 
@@ -37,27 +37,58 @@ if [ "$install_mcp" = 1 ]; then
     package="gmi[mcp] @ $package"
 fi
 
+run_command() {
+    printf 'Running:'
+    for argument in "$@"; do
+        printf " '%s'" "$(printf '%s' "$argument" | sed "s/'/'\\\\''/g")"
+    done
+    printf '\n'
+    "$@"
+}
+
+venv_install=0
 if command -v uv >/dev/null 2>&1; then
     set -- uv tool install "$package"
 elif command -v pipx >/dev/null 2>&1; then
     set -- pipx install "$package"
 elif python3 -m pip --version >/dev/null 2>&1; then
-    set -- python3 -m pip install --user "$package"
+    stdlib=$(python3 -c 'import sysconfig; print(sysconfig.get_path("stdlib"))' 2>/dev/null || true)
+    if [ -n "$stdlib" ] && [ -f "$stdlib/EXTERNALLY-MANAGED" ]; then
+        venv_install=1
+        gmi_home=${GMI_HOME:-$HOME/.local/share/gmi}
+        venv_path=$gmi_home/venv
+        set -- python3 -m venv "$venv_path"
+    else
+        set -- python3 -m pip install --user "$package"
+    fi
 else
     printf '%s\n' 'No installer found. Install uv, pipx or Python pip and try again.' >&2
     exit 1
 fi
 
-# Quote each argument so the printed command can be copied into a shell.
-printf 'Running:'
-for argument in "$@"; do
-    printf " '%s'" "$(printf '%s' "$argument" | sed "s/'/'\\\\''/g")"
-done
-printf '\n'
-"$@"
+if [ "$venv_install" = 1 ]; then
+    if ! run_command "$@"; then
+        printf '%s\n' 'Could not create the private virtual environment.' >&2
+        printf '%s\n' 'Install the missing package and run this installer again:' >&2
+        printf '%s\n' 'sudo apt install python3-venv' >&2
+        exit 1
+    fi
+    run_command "$venv_path/bin/python" -m pip install --upgrade "$package"
+    mkdir -p "$HOME/.local/bin"
+    run_command ln -sf "$venv_path/bin/gmi" "$HOME/.local/bin/gmi"
+    printf 'Created gmi in %s and linked %s\n' "$venv_path" "$HOME/.local/bin/gmi"
+    printf 'To uninstall, remove %s and %s\n' "$venv_path" "$HOME/.local/bin/gmi"
+else
+    run_command "$@"
+fi
 
 if command -v gmi >/dev/null 2>&1; then
     gmi --version
+elif [ "$venv_install" = 1 ]; then
+    case ":${PATH:-}:" in
+        *":$HOME/.local/bin:"*) ;;
+        *) printf 'Add this line to your shell profile: export PATH="$HOME/.local/bin:$PATH"\n' ;;
+    esac
 else
     user_bin=$(python3 -c 'import site; print(site.getuserbase() + "/bin")')
     printf 'Add the pip user bin directory to PATH: export PATH="%s:$PATH"\n' "$user_bin"
