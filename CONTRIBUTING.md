@@ -23,6 +23,13 @@ Run the offline suite before opening a pull request:
 pytest -q -m "not live and not live_media"
 ```
 
+The installer acceptance check uses Docker and two local images. It needs
+network access only for PyPI dependencies:
+
+```sh
+sh tools/test_install_docker.sh
+```
+
 The `live` marker calls the real GMI API. The `live_media` marker makes real
 media generations. Live tests need API keys and can cost money. Run them only
 when you intend to call the service. Keep chat checks tiny with `max_tokens`

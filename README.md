@@ -61,11 +61,13 @@ Include the optional MCP SDK:
 curl -fsSL https://raw.githubusercontent.com/zkasuran/gmi/main/install.sh | sh -s -- --mcp
 ```
 
-The installer requires Python 3.10 or newer and chooses uv, pipx or
-`python3 -m pip install --user` in that order. It installs the `v1.0.0` tag
-by default. Set `GMI_REF` on the shell running the script to choose another ref;
-`GMI_INSTALL_MCP=1` also enables MCP. Use `sh install.sh --help` from a checkout
-for usage. The script has only been tested against fake installers.
+The installer requires Python 3.10 or newer and chooses uv, pipx or Python pip
+in that order. On Debian and Ubuntu systems without uv or pipx where Python is
+externally managed it creates a private virtual environment at
+`~/.local/share/gmi/venv` and links `gmi` from `~/.local/bin`. It installs the
+`v1.0.0` tag by default. Set `GMI_REF` on the shell running the script to choose
+another ref; `GMI_INSTALL_MCP=1` also enables MCP. Use `sh install.sh --help`
+from a checkout for usage.
 
 ### Install with pip, pipx or uv
 
