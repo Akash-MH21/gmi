@@ -109,3 +109,69 @@ def test_installed_version_on_path(tmp_path):
 
 def test_shell_syntax():
     subprocess.run(["/bin/sh", "-n", str(SCRIPT)], check=True)
+
+
+def test_externally_managed_uses_private_venv(tmp_path):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    calls = tmp_path / "calls"
+    marker = tmp_path / "stdlib"
+    marker.mkdir()
+    (marker / "EXTERNALLY-MANAGED").write_text("")
+    python = bin_dir / "python3"
+    python.write_text(f'''#!/bin/sh
+printf 'python3|%s\\n' "$*" >> "$CALLS"
+if [ "$1" = -c ]; then
+  case "$2" in
+    *sys.version_info*) exit 0 ;;
+    *sysconfig*) printf '%s\\n' "{marker}" ;;
+    *getuserbase*) printf '%s\\n' "{tmp_path}/user" ;;
+  esac
+elif [ "$1" = -m ] && [ "$2" = pip ]; then
+  [ "$3" = --version ] && exit 0
+  exit 1
+elif [ "$1" = -m ] && [ "$2" = venv ]; then
+  mkdir -p "$3/bin"
+  cat > "$3/bin/python" <<'PY'
+#!/bin/sh
+printf 'venv-python|%s\\n' "$*" >> "$CALLS"
+touch "$(dirname "$0")/gmi"
+PY
+  chmod +x "$3/bin/python"
+fi
+''')
+    python.chmod(0o755)
+    for name in ("mkdir", "ln", "sed", "cat", "chmod", "touch", "dirname"):
+        (bin_dir / name).symlink_to("/bin/" + name)
+    environment = {"PATH": str(bin_dir), "CALLS": str(calls), "HOME": str(tmp_path)}
+    result = subprocess.run(["/bin/sh", str(SCRIPT)], env=environment,
+                            text=True, capture_output=True)
+    assert result.returncode == 0, result.stderr
+    assert (tmp_path / ".local/bin/gmi").is_symlink()
+    recorded = calls.read_text()
+    assert "pip install --user" not in recorded
+    assert "venv-python|-m pip install --upgrade" in recorded
+
+
+def test_venv_failure_prints_apt_hint_without_sudo(tmp_path):
+    bin_dir = tmp_path / "bin"
+    bin_dir.mkdir()
+    marker = tmp_path / "stdlib"
+    marker.mkdir()
+    (marker / "EXTERNALLY-MANAGED").write_text("")
+    python = bin_dir / "python3"
+    python.write_text(f'''#!/bin/sh
+if [ "$1" = -c ]; then
+  case "$2" in *sys.version_info*) exit 0 ;; *sysconfig*) printf '%s\\n' "{marker}" ;; esac
+elif [ "$1" = -m ] && [ "$2" = pip ]; then exit 0
+elif [ "$1" = -m ] && [ "$2" = venv ]; then exit 1
+fi
+''')
+    python.chmod(0o755)
+    (bin_dir / "sed").symlink_to("/bin/sed")
+    result = subprocess.run(["/bin/sh", str(SCRIPT)],
+                            env={"PATH": str(bin_dir), "HOME": str(tmp_path)},
+                            text=True, capture_output=True)
+    assert result.returncode != 0
+    assert "sudo apt install python3-venv" in result.stderr
+    assert "sudo|" not in result.stderr
