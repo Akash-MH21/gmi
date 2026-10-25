@@ -227,6 +227,20 @@ what people see first and what the demos show.
   Only the required `idc_name` query can be supplied through `--idc-name` or `GMI_SANDBOX_IDC_NAME`.
 - Licence Apache-2.0. Git author `zkasuran <289388318+zkasuran@users.noreply.github.com>`.
 
+## Release packaging facts (2026-10-25)
+
+- The package version in `pyproject.toml` and `src/gmi/__init__.py` is 1.0.0.
+  `gmi --version` prints `gmi 1.0.0`. HTTP User-Agent values use `__version__`.
+- Root `install.sh` is POSIX sh. It defaults to GitHub tag `v1.0.0`;
+  `GMI_REF` overrides the ref. `--mcp` or `GMI_INSTALL_MCP=1` adds the MCP extra.
+  It checks Python 3.10 or newer and chooses uv, pipx then Python pip with
+  `--user`. Installer tests use fake tools only. Real installation is unverified.
+- `CHANGELOG.md` records release capabilities and verification limits.
+  `CONTRIBUTING.md` gives human setup, test, generation and contribution guidance.
+  GitHub issue forms and the pull request template live in `.github/`.
+- From 1.0.0 documented commands follow semantic versioning. Areas marked as
+  not verified are excluded from that promise. Preserve all existing limits.
+
 ## How to report back
 
 End every run with: what now works (exact commands), the test command and its result,

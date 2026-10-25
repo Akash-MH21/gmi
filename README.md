@@ -45,9 +45,29 @@ GMI Cloud has an OpenAI-compatible API, a Model Hub and a web console. `gmi` add
 - **Careful with your key.** Hidden prompt, verified before it is saved, stored with mode 600, never printed.
 
 > [!NOTE]
-> **Status: Day 5 of a six-day public build (20 to 25 Oct 2026).** Days 1 to 3 include live API verification. The owner verified sandbox run, create, exec, file transfer, get, timeout and kill live on 23 October. The service image was built and run locally on 22 October. The MCP stdio server passes offline tests for both protocol eras; Codex verified live on 23 October 2026 (tools sandbox_list_templates and gmi_models called by Codex CLI 0.163.0 with model gpt-6.1-sol). Claude Code and Cursor not run here. Marketplace deployment and Cluster writes remain unverified. See the [roadmap](#roadmap) for scope and verification limits.
+> **Status: 1.0.0, Day 6 of a six-day public build (20 to 25 Oct 2026).** From 1.0.0 the documented commands follow semantic versioning. Areas marked as not verified are excluded from that promise. Days 1 to 3 include live API verification. The owner verified sandbox run, create, exec, file transfer, get, timeout and kill live on 23 October. The service image was built and run locally on 22 October. The MCP stdio server passes offline tests for both protocol eras; Codex verified live on 23 October 2026 (tools sandbox_list_templates and gmi_models called by Codex CLI 0.163.0 with model gpt-6.1-sol). Claude Code and Cursor not run here. Marketplace deployment and Cluster writes remain unverified. See the [roadmap](#roadmap) for scope and verification limits.
 
 ## Install
+
+### Install in one line
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/zkasuran/gmi/main/install.sh | sh
+```
+
+Include the optional MCP SDK:
+
+```sh
+curl -fsSL https://raw.githubusercontent.com/zkasuran/gmi/main/install.sh | sh -s -- --mcp
+```
+
+The installer requires Python 3.10 or newer and chooses uv, pipx or
+`python3 -m pip install --user` in that order. It installs the `v1.0.0` tag
+by default. Set `GMI_REF` on the shell running the script to choose another ref;
+`GMI_INSTALL_MCP=1` also enables MCP. Use `sh install.sh --help` from a checkout
+for usage. The script has only been tested against fake installers.
+
+### Install with pip, pipx or uv
 
 Requires Python 3.10 or newer.
 
@@ -753,7 +773,7 @@ Built in public, one working piece a day. The rule: nothing gets announced until
 | 3 | Thu 22 Oct | Commands generated from GMI's four published OpenAPI specs | **Shipped** |
 | 4 | Fri 23 Oct | `gmi sandbox` and `gmi serve` | **Shipped: sandbox run, create, exec, put, get-file, get, timeout and kill verified live by the owner on 23 October.** The service image was built and run locally on 22 October. Marketplace deployment and Cluster writes unverified. |
 | 5 | Sat 24 Oct | `gmi mcp serve`: gated API and curated tools for agents | Codex verified live on 23 October 2026 (tools sandbox_list_templates and gmi_models called by Codex CLI 0.163.0 with model gpt-6.1-sol). Claude Code and Cursor not run here. |
-| 6 | Sun 25 Oct | v1.0: docs, install one-liner, good first issues | Planned |
+| 6 | Sun 25 Oct | 1.0.0 version and User-Agent updates, one-line installer, changelog, contribution guide and templates, README and agent contract updates | **Shipped** |
 
 After the hackathon results are announced, gmi will be deployed on the AgentBox marketplace; until then the Docker image has only been built and run locally.
 
@@ -795,6 +815,16 @@ docs/              images used by this README
 ```
 
 Issues and pull requests are welcome.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) for setup, tests, generated API commands
+and the pull request checklist. Report a problem with the
+[bug report form](https://github.com/zkasuran/gmi/issues/new?template=bug_report.yml)
+or propose an improvement with the
+[feature request form](https://github.com/zkasuran/gmi/issues/new?template=feature_request.yml).
+Both [issue templates](.github/ISSUE_TEMPLATE/) ask contributors to keep keys
+and tokens out of reports. See [CHANGELOG.md](CHANGELOG.md) for release notes.
 
 ## License
 
