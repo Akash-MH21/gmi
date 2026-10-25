@@ -1,0 +1,51 @@
+name: Bug report
+description: Report a reproducible problem with gmi.
+title: "Bug: "
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Redact all API keys and tokens from commands, output and attachments.
+        Never paste credentials here. Check the README and docs for known limits.
+  - type: input
+    id: gmi-version
+    attributes:
+      label: gmi --version
+      description: Paste the output of gmi --version.
+    validations:
+      required: true
+  - type: input
+    id: os
+    attributes:
+      label: Operating system
+      description: Include the distribution or OS version.
+    validations:
+      required: true
+  - type: input
+    id: python-version
+    attributes:
+      label: Python version
+      description: Paste the output of python3 --version.
+    validations:
+      required: true
+  - type: textarea
+    id: command
+    attributes:
+      label: Exact command and reproduction steps
+      description: Include the smallest reproduction. Replace keys and tokens with REDACTED.
+      render: text
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behaviour
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual behaviour
+      description: Include relevant output after redacting keys and tokens.
+    validations:
+      required: true

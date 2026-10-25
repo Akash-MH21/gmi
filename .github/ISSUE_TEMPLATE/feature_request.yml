@@ -1,0 +1,26 @@
+name: Feature request
+description: Suggest a concrete improvement to gmi.
+title: "Feature: "
+body:
+  - type: markdown
+    attributes:
+      value: Check the README and docs for existing commands and limits. Never include keys or tokens.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem to solve
+      description: Describe the task you want to complete and what gets in the way.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behaviour
+      description: Give an example command or session interaction.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Describe any workaround or other approach you tried.
